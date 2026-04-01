@@ -8,9 +8,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": [
-        "packs/**"
-      ]
+      "includeFiles": "packs/**"
     }
   },
   "routes": [
