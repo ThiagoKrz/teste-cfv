@@ -1,18 +1,12 @@
-const packSelect = document.getElementById("packSelect");
-const packCount = document.getElementById("packCount");
-const openButton = document.getElementById("openButton");
-const openStatus = document.getElementById("openStatus");
-const openSummary = document.getElementById("openSummary");
-const openResults = document.getElementById("openResults");
-const packTotal = document.getElementById("packTotal");
+const cardQuery = document.getElementById("cardQuery");
+const cardButton = document.getElementById("cardButton");
+const cardStatus = document.getElementById("cardStatus");
+const cardResult = document.getElementById("cardResult");
 
-const catalogPack = document.getElementById("catalogPack");
-const searchQuery = document.getElementById("searchQuery");
-const rarityFilter = document.getElementById("rarityFilter");
-const clanFilter = document.getElementById("clanFilter");
-const catalogButton = document.getElementById("catalogButton");
-const catalogStatus = document.getElementById("catalogStatus");
-const catalogResults = document.getElementById("catalogResults");
+const batchInput = document.getElementById("batchInput");
+const batchButton = document.getElementById("batchButton");
+const batchStatus = document.getElementById("batchStatus");
+const batchResults = document.getElementById("batchResults");
 
 function setButtonLoading(button, isLoading, label) {
   if (!button) {
@@ -29,201 +23,183 @@ function setButtonLoading(button, isLoading, label) {
   }
 }
 
-async function loadPacks() {
-  const response = await fetch("/api/packs");
-  const data = await response.json();
-  const packs = data.packs || [];
-
-  packSelect.innerHTML = "";
-  catalogPack.innerHTML = "";
-
-  packs.forEach((pack) => {
-    const option = document.createElement("option");
-    option.value = pack;
-    option.textContent = pack;
-    packSelect.appendChild(option);
-
-    const optionClone = option.cloneNode(true);
-    catalogPack.appendChild(optionClone);
-  });
-
-  if (packs.length === 0) {
-    openStatus.textContent = "No packs found in /packs";
-    catalogStatus.textContent = "No packs found in /packs";
-    openResults.innerHTML =
-      '<div class="empty-state">Add CSV packs to /packs to start opening.</div>';
-  } else {
-    openResults.innerHTML =
-      '<div class="empty-state">Open packs to see pulls here.</div>';
+function escapeHtml(value) {
+  if (value === null || value === undefined) {
+    return "";
   }
-
-  if (packTotal) {
-    packTotal.textContent = packs.length ? String(packs.length) : "0";
-  }
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function renderCard(card) {
-  const rarity = (card.rarity || "UNKNOWN").toUpperCase();
-  const rarityClass = `rarity-${rarity.toLowerCase()}`;
-  const cardId = card.set ? `${card.set}-${card.id}` : card.id;
-
-  return `<li class="card ${rarityClass}">
-    <div class="card-head">
-      <strong>${card.name}</strong>
-      <span class="chip">${rarity}</span>
-    </div>
-    <div class="card-meta">${card.clan} | Grade ${card.grade} | ${card.type}</div>
-    <div class="card-id">${cardId}</div>
-  </li>`;
+function normalizeText(value) {
+  return String(value || "").trim();
 }
 
-function renderPack(pack, index) {
-  const cards = pack.map(renderCard).join("");
-  return `<article class="pack-result">
-    <header>
-      <span>Pack ${index + 1}</span>
-      <span>${pack.length} cards</span>
-    </header>
-    <ul>${cards}</ul>
-  </article>`;
+function formatEffect(text) {
+  const safe = escapeHtml(normalizeText(text));
+  return safe.replace(/\n/g, "<br />");
 }
 
-function renderSummary(summary) {
-  if (!summary) {
+function buildMetaItem(label, value) {
+  const display = normalizeText(value);
+  if (!display || display.toLowerCase() === "n/a") {
     return "";
   }
 
-  const byRarity = summary.by_rarity || {};
-  const totalCards = summary.total_cards || 0;
-  const order = ["SP", "RRR", "RR", "R", "C", "UNKNOWN"];
-  const rows = order
-    .filter((rarity) => byRarity[rarity])
-    .map((rarity) => {
-      const count = byRarity[rarity];
-      const percent = totalCards
-        ? Math.round((count / totalCards) * 100)
-        : 0;
-      const rarityClass = `rarity-${rarity.toLowerCase()}`;
-      return `<div class="rarity-row">
-        <span class="chip ${rarityClass}">${rarity}</span>
-        <div class="bar"><span style="width: ${percent}%"></span></div>
-        <span class="percent">${percent}%</span>
-      </div>`;
-    })
+  return `<div class="meta-item">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(display)}</strong>
+  </div>`;
+}
+
+function renderCard(card) {
+  const rarityValue = normalizeText(card.rarity) || "UNKNOWN";
+  const rarityClass = `rarity-${rarityValue.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+
+  const metaItems = [
+    buildMetaItem("Grade", card.grade),
+    buildMetaItem("Power", card.power),
+    buildMetaItem("Shield", card.shield),
+    buildMetaItem("Clan", card.clan),
+    buildMetaItem("Nation", card.nation),
+    buildMetaItem("Format", card.format),
+    buildMetaItem("Set", card.set),
+  ]
+    .filter(Boolean)
     .join("");
 
-  return `<div class="summary-grid">
-    <div>
-      <h3>Total cards</h3>
-      <p>${totalCards}</p>
+  const mainEffect = formatEffect(card.mainEffect);
+  const sourceEffect = formatEffect(card.sourceEffect);
+
+  return `<div class="card-result">
+    <div class="card-art">
+      <img src="${escapeHtml(card.imageUrl)}" alt="${escapeHtml(card.name)}" />
     </div>
-    <div>
-      <h3>Rarity mix</h3>
-      <div class="rarity-rows">${rows}</div>
+    <div class="card-info">
+      <div class="card-title">
+        <h3>${escapeHtml(card.name)}</h3>
+        <span class="chip ${rarityClass}">${escapeHtml(rarityValue)}</span>
+      </div>
+      <p class="card-sub">ID ${escapeHtml(card.id || "-")} · ${
+    escapeHtml(card.set || "Set not listed")
+  }</p>
+      <div class="card-meta-grid">${metaItems}</div>
+      <div class="card-effects">
+        ${mainEffect ? `<p>${mainEffect}</p>` : ""}
+        ${
+          sourceEffect
+            ? `<p class="muted">${sourceEffect}</p>`
+            : ""
+        }
+      </div>
+      <div class="link-row">
+        <a href="${escapeHtml(card.url)}" target="_blank" rel="noopener">View on vanguardcard.io</a>
+      </div>
     </div>
   </div>`;
 }
 
-async function openPacks() {
-  openStatus.textContent = "Opening packs...";
-  openSummary.innerHTML = "";
-  openResults.innerHTML =
-    '<div class="empty-state">Ripping packs...</div>';
-  setButtonLoading(openButton, true, "Opening...");
+function renderMiniCard(card) {
+  const rarityValue = normalizeText(card.rarity) || "UNKNOWN";
+  const rarityClass = `rarity-${rarityValue.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
 
-  const payload = {
-    pack: packSelect.value,
-    count: Number(packCount.value || 1),
-  };
+  return `<div class="batch-card">
+    <img src="${escapeHtml(card.imageUrl)}" alt="${escapeHtml(card.name)}" />
+    <div class="batch-title">${escapeHtml(card.name)}</div>
+    <div class="batch-meta">
+      <span class="chip ${rarityClass}">${escapeHtml(rarityValue)}</span>
+      <span class="batch-id">ID ${escapeHtml(card.id || "-")}</span>
+    </div>
+  </div>`;
+}
+
+async function fetchCard(search) {
+  const response = await fetch(`/api/card?search=${encodeURIComponent(search)}`);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail || "Failed to fetch card";
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+async function handleLookup() {
+  const search = normalizeText(cardQuery.value);
+  if (!search) {
+    cardStatus.textContent = "Enter a card ID or name first.";
+    return;
+  }
+
+  cardStatus.textContent = "Fetching card data...";
+  cardResult.innerHTML = "<div class=\"empty-state\">Loading card...</div>";
+  setButtonLoading(cardButton, true, "Searching...");
 
   try {
-    const response = await fetch("/api/open", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      openStatus.textContent = error.detail || "Failed to open packs";
-      openResults.innerHTML =
-        '<div class="empty-state">No results to show.</div>';
-      return;
-    }
-
-    const data = await response.json();
-    openSummary.innerHTML = renderSummary(data.summary);
-    openResults.innerHTML = data.packs.map(renderPack).join("");
-    openStatus.textContent = `Opened ${data.count} pack${
-      data.count === 1 ? "" : "s"
-    }.`;
+    const card = await fetchCard(search);
+    cardResult.innerHTML = renderCard(card);
+    cardStatus.textContent = `Found ${card.name}.`;
+  } catch (error) {
+    cardResult.innerHTML = "<div class=\"empty-state\">No results.</div>";
+    cardStatus.textContent = error.message || "Search failed.";
   } finally {
-    setButtonLoading(openButton, false);
+    setButtonLoading(cardButton, false);
   }
 }
 
-async function loadCatalog() {
-  catalogStatus.textContent = "Loading catalog...";
-  catalogResults.innerHTML = "";
-  setButtonLoading(catalogButton, true, "Loading...");
-
-  const params = new URLSearchParams();
-  if (searchQuery.value.trim()) {
-    params.set("q", searchQuery.value.trim());
-  }
-  if (rarityFilter.value) {
-    params.set("rarity", rarityFilter.value);
-  }
-  if (clanFilter.value.trim()) {
-    params.set("clan", clanFilter.value.trim());
-  }
-
-  const url = `/api/packs/${catalogPack.value}/cards?${params.toString()}`;
-  try {
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const error = await response.json();
-      catalogStatus.textContent = error.detail || "Failed to load catalog";
-      return;
-    }
-
-    const data = await response.json();
-    if (!data.cards || data.cards.length === 0) {
-      catalogStatus.textContent = "No cards found for this filter";
-      catalogResults.innerHTML =
-        '<li class="empty-state">No cards found.</li>';
-      return;
-    }
-
-    catalogResults.innerHTML = data.cards
-      .slice(0, 60)
-      .map(renderCard)
-      .join("");
-    catalogStatus.textContent = `Showing ${Math.min(
-      60,
-      data.cards.length
-    )} cards.`;
-  } finally {
-    setButtonLoading(catalogButton, false);
-  }
+function parseBatchInput(value) {
+  return value
+    .split(/[\n,]/g)
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean)
+    .slice(0, 8);
 }
 
-openButton.addEventListener("click", () => {
-  openPacks().catch(() => {
-    openStatus.textContent = "Unexpected error";
+async function handleBatchLookup() {
+  const ids = parseBatchInput(batchInput.value);
+  if (!ids.length) {
+    batchStatus.textContent = "Add at least one card ID.";
+    return;
+  }
+
+  batchStatus.textContent = `Fetching ${ids.length} cards...`;
+  batchResults.innerHTML = "<div class=\"empty-state\">Loading cards...</div>";
+  setButtonLoading(batchButton, true, "Loading...");
+
+  const cards = [];
+  for (const id of ids) {
+    try {
+      // Fetch sequentially to avoid hammering the upstream site.
+      const card = await fetchCard(id);
+      cards.push(card);
+      batchStatus.textContent = `Fetched ${cards.length} of ${ids.length}.`;
+    } catch (error) {
+      batchStatus.textContent = `Failed on ${id}: ${error.message}`;
+    }
+  }
+
+  if (!cards.length) {
+    batchResults.innerHTML = "<div class=\"empty-state\">No cards found.</div>";
+  } else {
+    batchResults.innerHTML = `<div class=\"batch-grid\">${cards
+      .map(renderMiniCard)
+      .join("")}</div>`;
+  }
+
+  setButtonLoading(batchButton, false);
+}
+
+cardButton.addEventListener("click", () => {
+  handleLookup().catch(() => {
+    cardStatus.textContent = "Unexpected error.";
   });
 });
 
-catalogButton.addEventListener("click", () => {
-  loadCatalog().catch(() => {
-    catalogStatus.textContent = "Unexpected error";
+batchButton.addEventListener("click", () => {
+  handleBatchLookup().catch(() => {
+    batchStatus.textContent = "Unexpected error.";
   });
-});
-
-loadPacks().catch(() => {
-  openStatus.textContent = "Failed to load packs";
-  catalogStatus.textContent = "Failed to load packs";
-  openResults.innerHTML =
-    '<div class="empty-state">API not reachable.</div>';
 });

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CFVanguard Pack Simulator</title>
+    <title>CFVanguard Card Explorer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,138 +22,127 @@
       <nav class="nav">
         <div class="brand">CFVanguard</div>
         <div class="nav-actions">
-          <a class="nav-link" href="#open">Open packs</a>
-          <a class="nav-link" href="#catalog">Catalog</a>
+          <a class="nav-link" href="#lookup">Lookup</a>
+          <a class="nav-link" href="#batch">Batch</a>
         </div>
       </nav>
       <div class="hero-grid">
         <div class="hero-copy">
-          <p class="badge">Pack simulator SaaS</p>
-          <h1>Roll the pack. Chase the glow.</h1>
+          <p class="badge">Vanguard card explorer</p>
+          <h1>Trace the card. Catch the art.</h1>
           <p class="subtitle">
-            Open Cardfight Vanguard packs in seconds, track rarity swings, and
-            keep your pulls organized.
+            Search the vanguardcard.io database to pull the main stats, effects,
+            and card image in seconds.
           </p>
           <div class="hero-actions">
-            <a class="cta" href="#open">Open packs</a>
-            <a class="ghost" href="#catalog">Browse catalog</a>
+            <a class="cta" href="#lookup">Search cards</a>
+            <a class="ghost" href="#batch">Batch lookup</a>
           </div>
           <div class="hero-stats">
             <div class="stat">
-              <span id="packTotal">0</span>
-              <small>Sets online</small>
+              <span>vanguardcard.io</span>
+              <small>Data source</small>
             </div>
             <div class="stat">
-              <span>5</span>
-              <small>Cards per pack</small>
+              <span>ID or name</span>
+              <small>Flexible search</small>
             </div>
             <div class="stat">
-              <span>70/20/9/1</span>
-              <small>R/RR/RRR/SP</small>
+              <span>Image ready</span>
+              <small>JP artwork link</small>
             </div>
           </div>
         </div>
         <div class="hero-card">
-          <h3>Rarity odds</h3>
-          <p>Every pack ships with 4 commons + 1 rare slot.</p>
+          <h3>What you get</h3>
+          <p>Grab key details without leaving the deck builder.</p>
           <div class="odds-grid">
             <div class="odds-chip rarity-r">
-              <span>R</span>
-              <small>70%</small>
+              <span>Name</span>
+              <small>Set and rarity</small>
             </div>
             <div class="odds-chip rarity-rr">
-              <span>RR</span>
-              <small>20%</small>
+              <span>Stats</span>
+              <small>Grade, power, shield</small>
             </div>
             <div class="odds-chip rarity-rrr">
-              <span>RRR</span>
-              <small>9%</small>
+              <span>Traits</span>
+              <small>Clan, nation, format</small>
             </div>
             <div class="odds-chip rarity-sp">
-              <span>SP</span>
-              <small>1%</small>
+              <span>Effects</span>
+              <small>Main + source text</small>
             </div>
           </div>
           <div class="hero-note">
             <strong>Tip</strong>
-            Log your pulls and share the haul with your team.
+            IDs like 411021 or 448628 return full card details.
           </div>
         </div>
       </div>
     </header>
 
     <main class="content">
-      <section class="panel" id="open">
+      <section class="panel" id="lookup">
         <div class="panel-header">
           <div>
-            <h2>Open packs</h2>
-            <p>Choose a set, open packs, and review pulls instantly.</p>
+            <h2>Card lookup</h2>
+            <p>Search by card ID or name to fetch the latest details.</p>
           </div>
-          <div class="pill">Live odds</div>
+          <div class="pill">Live data</div>
         </div>
         <div class="panel-grid">
           <div class="panel-control">
             <div class="controls">
               <label>
-                Pack
-                <select id="packSelect"></select>
+                Card ID or name
+                <input
+                  id="cardQuery"
+                  type="text"
+                  placeholder="411021 or Blaster Blade"
+                />
+                <span class="helper">Powered by vanguardcard.io.</span>
               </label>
-              <label>
-                Count
-                <input id="packCount" type="number" min="1" max="36" value="3" />
-                <span class="helper">Max 36 per batch.</span>
-              </label>
-              <button id="openButton">Open packs</button>
+              <button id="cardButton">Search card</button>
             </div>
-            <div class="status" id="openStatus"></div>
-            <div class="summary" id="openSummary"></div>
+            <div class="status" id="cardStatus"></div>
           </div>
           <div class="panel-output">
-            <div class="results" id="openResults"></div>
+            <div class="results" id="cardResult">
+              <div class="empty-state">Search for a card to see details.</div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="panel" id="catalog">
+      <section class="panel" id="batch">
         <div class="panel-header">
           <div>
-            <h2>Catalog</h2>
-            <p>Browse cards in a set and filter by rarity or clan.</p>
+            <h2>Batch lookup</h2>
+            <p>Paste multiple IDs and build a quick gallery.</p>
           </div>
-          <div class="pill ghost-pill">Filters</div>
+          <div class="pill ghost-pill">Quick view</div>
         </div>
         <div class="panel-grid">
           <div class="panel-control">
             <div class="controls">
               <label>
-                Pack
-                <select id="catalogPack"></select>
+                Card IDs
+                <textarea
+                  id="batchInput"
+                  rows="4"
+                  placeholder="411021, 448628, 863109"
+                ></textarea>
+                <span class="helper">Up to 8 IDs at once.</span>
               </label>
-              <label>
-                Search
-                <input id="searchQuery" type="text" placeholder="Name or id" />
-              </label>
-              <label>
-                Rarity
-                <select id="rarityFilter">
-                  <option value="">All</option>
-                  <option value="C">C</option>
-                  <option value="R">R</option>
-                  <option value="RR">RR</option>
-                  <option value="RRR">RRR</option>
-                  <option value="SP">SP</option>
-                </select>
-              </label>
-              <label>
-                Clan
-                <input id="clanFilter" type="text" placeholder="Royal Paladin" />
-              </label>
-              <button id="catalogButton">Load catalog</button>
+              <button id="batchButton">Load gallery</button>
             </div>
-            <div class="status" id="catalogStatus"></div>
+            <div class="status" id="batchStatus"></div>
           </div>
           <div class="panel-output">
-            <ul class="results" id="catalogResults"></ul>
+            <div class="results" id="batchResults">
+              <div class="empty-state">Paste IDs to generate a gallery.</div>
+            </div>
           </div>
         </div>
       </section>

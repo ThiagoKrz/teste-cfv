@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
+const cheerio = require("cheerio");
 
-const PACKS_DIR = path.join(process.cwd(), "packs");
+const BASE_URL = "https://vanguardcard.io";
+const IMAGE_FALLBACK = "https://images.vanguardcard.io/images/cards";
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -9,247 +9,115 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function parseCsvRows(content) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < content.length; i += 1) {
-    const char = content[i];
-
-    if (inQuotes) {
-      if (char === "\"") {
-        if (content[i + 1] === "\"") {
-          field += "\"";
-          i += 1;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += char;
-      }
-      continue;
-    }
-
-    if (char === "\"") {
-      inQuotes = true;
-      continue;
-    }
-
-    if (char === ",") {
-      row.push(field);
-      field = "";
-      continue;
-    }
-
-    if (char === "\n") {
-      row.push(field);
-      field = "";
-      if (row.length > 1 || row[0] !== "") {
-        rows.push(row);
-      }
-      row = [];
-      continue;
-    }
-
-    if (char === "\r") {
-      continue;
-    }
-
-    field += char;
+function normalizeText(value) {
+  if (!value) {
+    return "";
   }
-
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  return rows;
+  return value.replace(/\s+/g, " ").trim();
 }
 
-function parseCsv(content) {
-  const rows = parseCsvRows(content);
-  if (!rows.length) {
-    return [];
-  }
-
-  const headers = rows.shift().map((header) => header.trim());
-  return rows
-    .filter((row) => row.some((value) => value && value.trim()))
-    .map((row) => {
-      const record = {};
-      headers.forEach((header, index) => {
-        record[header] = (row[index] || "").trim();
-      });
-      return record;
-    });
+function parseStat(text, label) {
+  const pattern = new RegExp(`${label}\\s+([^\\s]+(?:\\s+[^\\s]+)*)`, "i");
+  const match = text.match(pattern);
+  return match ? normalizeText(match[1]) : "";
 }
 
-function listPackNames() {
-  if (!fs.existsSync(PACKS_DIR)) {
-    return [];
+function extractCardData(html, search) {
+  const $ = cheerio.load(html);
+
+  const name = normalizeText($(".card-name h1").first().text());
+  if (!name) {
+    return null;
   }
 
-  return fs
-    .readdirSync(PACKS_DIR)
-    .filter((name) => name.toLowerCase().endsWith(".csv"))
-    .map((name) => path.basename(name, ".csv"))
-    .sort();
+  const imageNode = $(".card-image img").first();
+  let imageUrl =
+    imageNode.attr("data-src") || imageNode.attr("src") || "";
+
+  if (imageUrl && imageUrl.startsWith("//")) {
+    imageUrl = `https:${imageUrl}`;
+  }
+
+  if (!imageUrl && search) {
+    imageUrl = `${IMAGE_FALLBACK}/${encodeURIComponent(search)}-jp.jpg`;
+  }
+
+  const miscText = normalizeText($(".card-misc").first().text());
+  const grade = parseStat(miscText, "Grade");
+  const power = parseStat(miscText, "Power");
+  const shield = parseStat(miscText, "Shield");
+
+  const costsText = normalizeText($(".card-costs").first().text());
+  const clanMatch = costsText.match(/Clan\s+(.+?)\s+Nation\s+/i);
+  const nationMatch = costsText.match(/Nation\s+(.+)$/i);
+
+  const attributeText = normalizeText($(".card-attribute").first().text());
+  const criticalMatch = attributeText.match(/Critical\s+(.+?)\s+Card Format/i);
+  const formatMatch = attributeText.match(/Card Format\s+(.+)$/i);
+
+  const rarity = normalizeText($(".card-rarity").first().text());
+  const setName = normalizeText($(".card-set .card-set-line").first().text());
+
+  const mainEffect = normalizeText(
+    $(".card-main-eff")
+      .first()
+      .html()
+      ?.replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "") || ""
+  );
+  const sourceEffect = normalizeText(
+    $(".card-source-eff")
+      .first()
+      .html()
+      ?.replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "") || ""
+  );
+  const cardNumber = normalizeText($(".card-number").first().text());
+
+  return {
+    id: String(search || "").trim(),
+    name,
+    imageUrl,
+    grade,
+    power,
+    shield,
+    rarity,
+    clan: clanMatch ? normalizeText(clanMatch[1]) : "",
+    nation: nationMatch ? normalizeText(nationMatch[1]) : "",
+    critical: criticalMatch ? normalizeText(criticalMatch[1]) : "",
+    format: formatMatch ? normalizeText(formatMatch[1]) : "",
+    set: setName,
+    cardNumber,
+    mainEffect,
+    sourceEffect,
+    url: `${BASE_URL}/card/?search=${encodeURIComponent(search || "")}`,
+  };
 }
 
-function loadPackCards(pack) {
-  const packFile = path.join(PACKS_DIR, `${pack}.csv`);
-  if (!fs.existsSync(packFile)) {
-    throw new Error("PACK_NOT_FOUND");
+async function fetchCard(search) {
+  if (typeof fetch !== "function") {
+    throw new Error("FETCH_UNAVAILABLE");
   }
 
-  const content = fs.readFileSync(packFile, "utf8");
-  const records = parseCsv(content);
-  return records.map((row) => ({
-    set: (row.set || "").trim(),
-    id: (row.id || "").trim(),
-    name: (row.name || "").trim(),
-    grade: (row.grade || "").trim(),
-    clan: (row.clan || "").trim(),
-    type: (row.type || "").trim(),
-    rarity: (row.rarity || "").trim(),
-  }));
-}
-
-function sampleCards(pool, count) {
-  if (!pool.length) {
-    return [];
-  }
-
-  if (pool.length >= count) {
-    const picks = [];
-    const remaining = pool.slice();
-    for (let i = 0; i < count; i += 1) {
-      const index = Math.floor(Math.random() * remaining.length);
-      picks.push(remaining.splice(index, 1)[0]);
-    }
-    return picks;
-  }
-
-  const picks = [];
-  for (let i = 0; i < count; i += 1) {
-    const index = Math.floor(Math.random() * pool.length);
-    picks.push(pool[index]);
-  }
-  return picks;
-}
-
-function rollRarity() {
-  const roll = Math.floor(Math.random() * 100) + 1;
-  if (roll <= 70) {
-    return "R";
-  }
-  if (roll <= 90) {
-    return "RR";
-  }
-  if (roll <= 99) {
-    return "RRR";
-  }
-  return "SP";
-}
-
-function pickRare(cards) {
-  const rarity = rollRarity();
-  const pool = cards.filter((card) => card.rarity === rarity);
-  const rare = sampleCards(pool, 1);
-  if (rare.length) {
-    return rare;
-  }
-
-  const fallbacks = ["RRR", "RR", "R", "C"];
-  for (const fallback of fallbacks) {
-    const fallbackPool = cards.filter((card) => card.rarity === fallback);
-    const fallbackPick = sampleCards(fallbackPool, 1);
-    if (fallbackPick.length) {
-      return fallbackPick;
-    }
-  }
-
-  return [];
-}
-
-function openSinglePack(cards) {
-  const commonsPool = cards.filter((card) => card.rarity === "C");
-  const commons = sampleCards(commonsPool, 4);
-  const rare = pickRare(cards);
-  return commons.concat(rare);
-}
-
-function openManyPacks(cards, count) {
-  const packs = [];
-  for (let i = 0; i < count; i += 1) {
-    packs.push(openSinglePack(cards));
-  }
-  return packs;
-}
-
-function summarizePacks(packs) {
-  const byRarity = {};
-  let totalCards = 0;
-
-  for (const pack of packs) {
-    for (const card of pack) {
-      totalCards += 1;
-      const rarity = card.rarity || "UNKNOWN";
-      byRarity[rarity] = (byRarity[rarity] || 0) + 1;
-    }
-  }
-
-  return { by_rarity: byRarity, total_cards: totalCards };
-}
-
-function filterCards(cards, query, rarity, clan, cardType, grade) {
-  let filtered = cards.slice();
-
-  if (query) {
-    const queryLower = query.toLowerCase();
-    filtered = filtered.filter(
-      (card) =>
-        card.name.toLowerCase().includes(queryLower) ||
-        card.id.toLowerCase().includes(queryLower)
-    );
-  }
-
-  if (rarity) {
-    filtered = filtered.filter((card) => card.rarity === rarity);
-  }
-
-  if (clan) {
-    const clanLower = clan.toLowerCase();
-    filtered = filtered.filter((card) =>
-      card.clan.toLowerCase().includes(clanLower)
-    );
-  }
-
-  if (cardType) {
-    const typeLower = cardType.toLowerCase();
-    filtered = filtered.filter((card) =>
-      card.type.toLowerCase().includes(typeLower)
-    );
-  }
-
-  if (grade) {
-    filtered = filtered.filter((card) => card.grade === grade);
-  }
-
-  return filtered;
-}
-
-function readRequestBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-    req.on("data", (chunk) => {
-      body += chunk;
-    });
-    req.on("end", () => resolve(body));
-    req.on("error", reject);
+  const targetUrl = `${BASE_URL}/card/?search=${encodeURIComponent(search)}`;
+  const response = await fetch(targetUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; CFVanguard/1.0)",
+      Accept: "text/html",
+    },
   });
+
+  if (!response.ok) {
+    throw new Error("FETCH_FAILED");
+  }
+
+  const html = await response.text();
+  const card = extractCardData(html, search);
+  if (!card) {
+    throw new Error("CARD_NOT_FOUND");
+  }
+
+  return card;
 }
 
 module.exports = async (req, res) => {
@@ -264,72 +132,25 @@ module.exports = async (req, res) => {
     return sendJson(res, 200, { status: "ok" });
   }
 
-  if (req.method === "GET" && segments.length === 2 && segments[1] === "packs") {
-    return sendJson(res, 200, { packs: listPackNames() });
-  }
+  if (req.method === "GET" && segments.length >= 2 && segments[1] === "card") {
+    const search =
+      segments[2] || url.searchParams.get("search") || url.searchParams.get("id");
 
-  if (
-    req.method === "GET" &&
-    segments.length === 4 &&
-    segments[1] === "packs" &&
-    segments[3] === "cards"
-  ) {
-    const packName = segments[2].toUpperCase();
+    if (!search) {
+      return sendJson(res, 400, { detail: "Search is required" });
+    }
+
     try {
-      const cards = loadPackCards(packName);
-      const query = url.searchParams.get("q");
-      const rarity = url.searchParams.get("rarity");
-      const clan = url.searchParams.get("clan");
-      const cardType = url.searchParams.get("type");
-      const grade = url.searchParams.get("grade");
-
-      const filtered = filterCards(cards, query, rarity, clan, cardType, grade);
-      return sendJson(res, 200, { pack: packName, cards: filtered });
+      const card = await fetchCard(String(search).trim());
+      return sendJson(res, 200, card);
     } catch (error) {
-      if (error.message === "PACK_NOT_FOUND") {
-        return sendJson(res, 404, { detail: "Pack not found" });
+      if (error.message === "CARD_NOT_FOUND") {
+        return sendJson(res, 404, { detail: "Card not found" });
       }
-      return sendJson(res, 500, { detail: "Failed to load pack" });
-    }
-  }
-
-  if (req.method === "POST" && segments.length === 2 && segments[1] === "open") {
-    let payload = null;
-
-    try {
-      const body = await readRequestBody(req);
-      payload = body ? JSON.parse(body) : {};
-    } catch (error) {
-      return sendJson(res, 400, { detail: "Invalid JSON payload" });
-    }
-
-    const pack = String(payload.pack || "").trim().toUpperCase();
-    const count = Number(payload.count || 1);
-
-    if (!pack) {
-      return sendJson(res, 400, { detail: "Pack is required" });
-    }
-
-    if (!Number.isInteger(count) || count < 1 || count > 100) {
-      return sendJson(res, 400, { detail: "Count must be between 1 and 100" });
-    }
-
-    try {
-      const cards = loadPackCards(pack);
-      const opened = openManyPacks(cards, count);
-      const summary = summarizePacks(opened);
-
-      return sendJson(res, 200, {
-        pack,
-        count,
-        packs: opened,
-        summary,
-      });
-    } catch (error) {
-      if (error.message === "PACK_NOT_FOUND") {
-        return sendJson(res, 404, { detail: "Pack not found" });
+      if (error.message === "FETCH_UNAVAILABLE") {
+        return sendJson(res, 500, { detail: "Fetch not available" });
       }
-      return sendJson(res, 500, { detail: "Failed to open packs" });
+      return sendJson(res, 502, { detail: "Failed to fetch card" });
     }
   }
 
