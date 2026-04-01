@@ -18,6 +18,42 @@ function normalizeText(value) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function cleanName(value) {
+  let cleaned = normalizeText(value);
+  cleaned = cleaned.replace(/\s+-\s+Cardfight Vanguard.*$/i, "");
+  cleaned = cleaned.replace(/\s+-\s+Cardfight.*$/i, "");
+  cleaned = cleaned.replace(/\s+-\s+vanguardcard\.io$/i, "");
+  cleaned = cleaned.replace(/\s+-\s+Card Database.*$/i, "");
+  return cleaned.trim();
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractByLabels(text, labels, stopLabels) {
+  if (!text) {
+    return "";
+  }
+
+  const labelPattern = labels.map(escapeRegExp).join("|");
+  const stopPattern = stopLabels && stopLabels.length
+    ? stopLabels.map(escapeRegExp).join("|")
+    : "$";
+
+  const pattern = new RegExp(`(?:${labelPattern})\\s*:?\\s*(.+?)(?=${stopPattern}|$)`, "i");
+  const match = text.match(pattern);
+  return match ? normalizeText(match[1]) : "";
+}
+
+function extractRarityToken(text) {
+  if (!text) {
+    return "";
+  }
+  const match = text.match(/\b(SP|RRR|RR|R|C)\b/i);
+  return match ? match[1].toUpperCase() : "";
+}
+
 function parseStat(text, label, nextLabels) {
   const next = nextLabels && nextLabels.length
     ? `(?=${nextLabels.join("|")})`
@@ -30,10 +66,11 @@ function parseStat(text, label, nextLabels) {
 function extractCardData(html, search) {
   const $ = cheerio.load(html);
 
-  const name =
+  const rawName =
     normalizeText($(".card-name h1").first().text()) ||
     normalizeText($("meta[property='og:title']").attr("content")) ||
     normalizeText($("title").first().text());
+  const name = cleanName(rawName);
   if (!name) {
     return null;
   }
@@ -66,7 +103,9 @@ function extractCardData(html, search) {
   const criticalMatch = attributeText.match(/Critical\s+(.+?)(?=Card Format|$)/i);
   const formatMatch = attributeText.match(/Card Format\s+(.+)$/i);
 
-  const rarity = normalizeText($(".card-rarity").first().text());
+  const rarity =
+    normalizeText($(".card-rarity").first().text()) ||
+    extractRarityToken(miscText);
   const setName = normalizeText($(".card-set .card-set-line").first().text());
 
   const mainEffect = normalizeText(
@@ -138,6 +177,158 @@ async function fetchCard(search) {
   return card;
 }
 
+async function fetchHtml(targetUrl) {
+  if (typeof fetch !== "function") {
+    throw new Error("FETCH_UNAVAILABLE");
+  }
+
+  const response = await fetch(targetUrl, {
+    headers: {
+      "User-Agent": DEFAULT_UA,
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+      Referer: BASE_URL,
+      "Cache-Control": "no-cache",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("FETCH_FAILED");
+  }
+
+  if (response.url && !response.url.startsWith(BASE_URL)) {
+    throw new Error("UPSTREAM_BLOCKED");
+  }
+
+  return response.text();
+}
+
+function resolveImageUrl(url, fallbackId) {
+  if (!url && fallbackId) {
+    return `${IMAGE_FALLBACK}/${encodeURIComponent(fallbackId)}-jp.jpg`;
+  }
+
+  if (!url) {
+    return "";
+  }
+
+  if (url.startsWith("//")) {
+    return `https:${url}`;
+  }
+
+  if (url.startsWith("/")) {
+    return `${BASE_URL}${url}`;
+  }
+
+  return url;
+}
+
+function extractCatalogCards(html) {
+  const $ = cheerio.load(html);
+  const cards = [];
+  const seen = new Set();
+
+  $("a[href*='/card?search=']").each((_, element) => {
+    const href = $(element).attr("href") || "";
+    const linkUrl = new URL(href, BASE_URL);
+    const id = normalizeText(linkUrl.searchParams.get("search") || "");
+    if (!id || seen.has(id)) {
+      return;
+    }
+
+    const container = $(element).closest(
+      "tr, .card-item, .card, .result, .card-list-item, li, .row"
+    );
+    const containerText = normalizeText(container.text());
+    const imageNode = $(element).find("img").first();
+    const name = cleanName(
+      normalizeText($(element).attr("title")) ||
+        normalizeText(imageNode.attr("title")) ||
+        normalizeText(imageNode.attr("alt")) ||
+        normalizeText(container.find(".card-name, .name").first().text()) ||
+        normalizeText($(element).text())
+    );
+
+    const imageUrl = resolveImageUrl(
+      imageNode.attr("data-src") || imageNode.attr("src") || "",
+      id
+    );
+
+    const grade =
+      normalizeText(container.find(".card-grade, .grade").first().text()) ||
+      extractByLabels(containerText, ["Grade"], [
+        "Power",
+        "Shield",
+        "Rarity",
+        "Clan",
+        "Nation",
+        "Format",
+        "Set",
+      ]);
+
+    const rarity =
+      normalizeText(container.find(".card-rarity, .rarity").first().text()) ||
+      extractByLabels(containerText, ["Rarity"], [
+        "Grade",
+        "Power",
+        "Clan",
+        "Nation",
+        "Format",
+        "Set",
+      ]) ||
+      extractRarityToken(containerText);
+
+    const clan =
+      normalizeText(container.find(".card-clan, .clan").first().text()) ||
+      extractByLabels(containerText, ["Clan"], ["Nation", "Format", "Set"]);
+
+    const nation =
+      normalizeText(container.find(".card-nation, .nation").first().text()) ||
+      extractByLabels(containerText, ["Nation"], ["Format", "Set"]);
+
+    const format =
+      normalizeText(container.find(".card-format, .format").first().text()) ||
+      extractByLabels(containerText, ["Format", "Card Format"], ["Set"]);
+
+    const setName =
+      normalizeText(
+        container.find("a[href*='/pack']").first().text()
+      ) ||
+      normalizeText(container.find(".card-set, .set").first().text()) ||
+      extractByLabels(containerText, ["Set"], []);
+
+    cards.push({
+      id,
+      name: name || id,
+      imageUrl,
+      grade,
+      rarity,
+      clan,
+      nation,
+      format,
+      set: setName,
+      url: `${BASE_URL}/card/?search=${encodeURIComponent(id)}`,
+    });
+    seen.add(id);
+  });
+
+  return cards;
+}
+
+async function fetchCatalog(query, limit) {
+  const targetUrl = `${BASE_URL}/card-database/?search=${encodeURIComponent(
+    query || ""
+  )}`;
+  const html = await fetchHtml(targetUrl);
+  const cards = extractCatalogCards(html);
+
+  return {
+    sourceUrl: targetUrl,
+    cards: cards.slice(0, limit),
+    total: cards.length,
+  };
+}
+
 module.exports = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const segments = url.pathname.split("/").filter(Boolean);
@@ -172,6 +363,33 @@ module.exports = async (req, res) => {
         return sendJson(res, 502, { detail: "Upstream blocked" });
       }
       return sendJson(res, 502, { detail: "Failed to fetch card" });
+    }
+  }
+
+  if (req.method === "GET" && segments.length >= 2 && segments[1] === "search") {
+    const query =
+      url.searchParams.get("search") || url.searchParams.get("q") || "";
+    const limitParam = Number(url.searchParams.get("limit") || 120);
+    const limit = Number.isFinite(limitParam)
+      ? Math.max(1, Math.min(200, Math.floor(limitParam)))
+      : 120;
+
+    try {
+      const result = await fetchCatalog(String(query).trim(), limit);
+      return sendJson(res, 200, {
+        query: String(query || ""),
+        total: result.total,
+        cards: result.cards,
+        sourceUrl: result.sourceUrl,
+      });
+    } catch (error) {
+      if (error.message === "FETCH_UNAVAILABLE") {
+        return sendJson(res, 500, { detail: "Fetch not available" });
+      }
+      if (error.message === "UPSTREAM_BLOCKED") {
+        return sendJson(res, 502, { detail: "Upstream blocked" });
+      }
+      return sendJson(res, 502, { detail: "Failed to fetch catalog" });
     }
   }
 
