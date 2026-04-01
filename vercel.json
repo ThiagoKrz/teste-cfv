@@ -2,14 +2,24 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+      "src": "api/index.js",
+      "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "functions": {
+    "api/index.js": {
+      "includeFiles": [
+        "packs/**"
+      ]
+    }
+  },
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
     }
   ]
 }
