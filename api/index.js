@@ -2,6 +2,8 @@ const cheerio = require("cheerio");
 
 const BASE_URL = "https://vanguardcard.io";
 const IMAGE_FALLBACK = "https://images.vanguardcard.io/images/cards";
+const DEFAULT_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -16,8 +18,11 @@ function normalizeText(value) {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function parseStat(text, label) {
-  const pattern = new RegExp(`${label}\\s+([^\\s]+(?:\\s+[^\\s]+)*)`, "i");
+function parseStat(text, label, nextLabels) {
+  const next = nextLabels && nextLabels.length
+    ? `(?=${nextLabels.join("|")})`
+    : "$";
+  const pattern = new RegExp(`${label}\\s+(.+?)${next}`, "i");
   const match = text.match(pattern);
   return match ? normalizeText(match[1]) : "";
 }
@@ -25,14 +30,20 @@ function parseStat(text, label) {
 function extractCardData(html, search) {
   const $ = cheerio.load(html);
 
-  const name = normalizeText($(".card-name h1").first().text());
+  const name =
+    normalizeText($(".card-name h1").first().text()) ||
+    normalizeText($("meta[property='og:title']").attr("content")) ||
+    normalizeText($("title").first().text());
   if (!name) {
     return null;
   }
 
   const imageNode = $(".card-image img").first();
   let imageUrl =
-    imageNode.attr("data-src") || imageNode.attr("src") || "";
+    imageNode.attr("data-src") ||
+    imageNode.attr("src") ||
+    $("meta[property='og:image']").attr("content") ||
+    "";
 
   if (imageUrl && imageUrl.startsWith("//")) {
     imageUrl = `https:${imageUrl}`;
@@ -43,16 +54,16 @@ function extractCardData(html, search) {
   }
 
   const miscText = normalizeText($(".card-misc").first().text());
-  const grade = parseStat(miscText, "Grade");
-  const power = parseStat(miscText, "Power");
-  const shield = parseStat(miscText, "Shield");
+  const grade = parseStat(miscText, "Grade", ["Power", "Shield"]);
+  const power = parseStat(miscText, "Power", ["Shield"]);
+  const shield = parseStat(miscText, "Shield", []);
 
   const costsText = normalizeText($(".card-costs").first().text());
-  const clanMatch = costsText.match(/Clan\s+(.+?)\s+Nation\s+/i);
+  const clanMatch = costsText.match(/Clan\s+(.+?)(?=Nation|$)/i);
   const nationMatch = costsText.match(/Nation\s+(.+)$/i);
 
   const attributeText = normalizeText($(".card-attribute").first().text());
-  const criticalMatch = attributeText.match(/Critical\s+(.+?)\s+Card Format/i);
+  const criticalMatch = attributeText.match(/Critical\s+(.+?)(?=Card Format|$)/i);
   const formatMatch = attributeText.match(/Card Format\s+(.+)$/i);
 
   const rarity = normalizeText($(".card-rarity").first().text());
@@ -102,13 +113,20 @@ async function fetchCard(search) {
   const targetUrl = `${BASE_URL}/card/?search=${encodeURIComponent(search)}`;
   const response = await fetch(targetUrl, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; CFVanguard/1.0)",
-      Accept: "text/html",
+      "User-Agent": DEFAULT_UA,
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+      Referer: BASE_URL,
+      "Cache-Control": "no-cache",
     },
   });
 
   if (!response.ok) {
     throw new Error("FETCH_FAILED");
+  }
+
+  if (response.url && !response.url.startsWith(BASE_URL)) {
+    throw new Error("UPSTREAM_BLOCKED");
   }
 
   const html = await response.text();
@@ -149,6 +167,9 @@ module.exports = async (req, res) => {
       }
       if (error.message === "FETCH_UNAVAILABLE") {
         return sendJson(res, 500, { detail: "Fetch not available" });
+      }
+      if (error.message === "UPSTREAM_BLOCKED") {
+        return sendJson(res, 502, { detail: "Upstream blocked" });
       }
       return sendJson(res, 502, { detail: "Failed to fetch card" });
     }
