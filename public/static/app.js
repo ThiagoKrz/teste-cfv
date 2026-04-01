@@ -372,12 +372,11 @@ function renderCatalog() {
 
 async function handleCatalogLoad() {
   const query = normalizeText(catalogQuery.value);
-  if (!query) {
-    catalogStatus.textContent = "Type a search term to load cards.";
-    return;
-  }
+  const statusLabel = query
+    ? "Loading catalog..."
+    : "Loading full catalog...";
 
-  catalogStatus.textContent = "Loading catalog...";
+  catalogStatus.textContent = statusLabel;
   catalogResults.innerHTML =
     "<div class=\"empty-state\">Fetching cards...</div>";
   setButtonLoading(catalogButton, true, "Loading...");

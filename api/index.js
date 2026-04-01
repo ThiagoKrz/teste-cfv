@@ -54,6 +54,14 @@ function extractRarityToken(text) {
   return match ? match[1].toUpperCase() : "";
 }
 
+function extractCardIdFromImage(url) {
+  if (!url) {
+    return "";
+  }
+  const match = url.match(/\/cards\/(\d+)-/i);
+  return match ? match[1] : "";
+}
+
 function parseStat(text, label, nextLabels) {
   const next = nextLabels && nextLabels.length
     ? `(?=${nextLabels.join("|")})`
@@ -312,18 +320,59 @@ function extractCatalogCards(html) {
     seen.add(id);
   });
 
+  $("img").each((_, element) => {
+    const imageNode = $(element);
+    const rawUrl = imageNode.attr("data-src") || imageNode.attr("src") || "";
+    const id = extractCardIdFromImage(rawUrl);
+    if (!id || seen.has(id)) {
+      return;
+    }
+
+    const name = cleanName(
+      normalizeText(imageNode.attr("title")) ||
+        normalizeText(imageNode.attr("alt")) ||
+        id
+    );
+
+    cards.push({
+      id,
+      name: name || id,
+      imageUrl: resolveImageUrl(rawUrl, id),
+      grade: "",
+      rarity: "",
+      clan: "",
+      nation: "",
+      format: "",
+      set: "",
+      url: `${BASE_URL}/card/?search=${encodeURIComponent(id)}`,
+    });
+    seen.add(id);
+  });
+
   return cards;
 }
 
 async function fetchCatalog(query, limit) {
-  const targetUrl = `${BASE_URL}/card-database/?search=${encodeURIComponent(
-    query || ""
-  )}`;
+  const trimmed = String(query || "").trim();
+  const targetUrl = trimmed
+    ? `${BASE_URL}/card-database/?search=${encodeURIComponent(trimmed)}`
+    : `${BASE_URL}/card-database/`;
+
   const html = await fetchHtml(targetUrl);
-  const cards = extractCatalogCards(html);
+  let cards = extractCatalogCards(html);
+  let sourceUrl = targetUrl;
+
+  if (!cards.length && trimmed) {
+    const cardUrl = `${BASE_URL}/card/?search=${encodeURIComponent(trimmed)}`;
+    const cardHtml = await fetchHtml(cardUrl);
+    const mainCard = extractCardData(cardHtml, trimmed);
+    const related = extractCatalogCards(cardHtml);
+    cards = [mainCard, ...related].filter(Boolean);
+    sourceUrl = cardUrl;
+  }
 
   return {
-    sourceUrl: targetUrl,
+    sourceUrl,
     cards: cards.slice(0, limit),
     total: cards.length,
   };
