@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CFVanguard Pack Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+    <div class="bg-orb orb-three"></div>
+    <header class="hero">
+      <nav class="nav">
+        <div class="brand">CFVanguard</div>
+        <div class="nav-actions">
+          <a class="nav-link" href="#open">Open packs</a>
+          <a class="nav-link" href="#catalog">Catalog</a>
+        </div>
+      </nav>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="badge">Pack simulator SaaS</p>
+          <h1>Roll the pack. Chase the glow.</h1>
+          <p class="subtitle">
+            Open Cardfight Vanguard packs in seconds, track rarity swings, and
+            keep your pulls organized.
+          </p>
+          <div class="hero-actions">
+            <a class="cta" href="#open">Open packs</a>
+            <a class="ghost" href="#catalog">Browse catalog</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat">
+              <span id="packTotal">0</span>
+              <small>Sets online</small>
+            </div>
+            <div class="stat">
+              <span>5</span>
+              <small>Cards per pack</small>
+            </div>
+            <div class="stat">
+              <span>70/20/9/1</span>
+              <small>R/RR/RRR/SP</small>
+            </div>
+          </div>
+        </div>
+        <div class="hero-card">
+          <h3>Rarity odds</h3>
+          <p>Every pack ships with 4 commons + 1 rare slot.</p>
+          <div class="odds-grid">
+            <div class="odds-chip rarity-r">
+              <span>R</span>
+              <small>70%</small>
+            </div>
+            <div class="odds-chip rarity-rr">
+              <span>RR</span>
+              <small>20%</small>
+            </div>
+            <div class="odds-chip rarity-rrr">
+              <span>RRR</span>
+              <small>9%</small>
+            </div>
+            <div class="odds-chip rarity-sp">
+              <span>SP</span>
+              <small>1%</small>
+            </div>
+          </div>
+          <div class="hero-note">
+            <strong>Tip</strong>
+            Log your pulls and share the haul with your team.
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="panel" id="open">
+        <div class="panel-header">
+          <div>
+            <h2>Open packs</h2>
+            <p>Choose a set, open packs, and review pulls instantly.</p>
+          </div>
+          <div class="pill">Live odds</div>
+        </div>
+        <div class="panel-grid">
+          <div class="panel-control">
+            <div class="controls">
+              <label>
+                Pack
+                <select id="packSelect"></select>
+              </label>
+              <label>
+                Count
+                <input id="packCount" type="number" min="1" max="36" value="3" />
+                <span class="helper">Max 36 per batch.</span>
+              </label>
+              <button id="openButton">Open packs</button>
+            </div>
+            <div class="status" id="openStatus"></div>
+            <div class="summary" id="openSummary"></div>
+          </div>
+          <div class="panel-output">
+            <div class="results" id="openResults"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="catalog">
+        <div class="panel-header">
+          <div>
+            <h2>Catalog</h2>
+            <p>Browse cards in a set and filter by rarity or clan.</p>
+          </div>
+          <div class="pill ghost-pill">Filters</div>
+        </div>
+        <div class="panel-grid">
+          <div class="panel-control">
+            <div class="controls">
+              <label>
+                Pack
+                <select id="catalogPack"></select>
+              </label>
+              <label>
+                Search
+                <input id="searchQuery" type="text" placeholder="Name or id" />
+              </label>
+              <label>
+                Rarity
+                <select id="rarityFilter">
+                  <option value="">All</option>
+                  <option value="C">C</option>
+                  <option value="R">R</option>
+                  <option value="RR">RR</option>
+                  <option value="RRR">RRR</option>
+                  <option value="SP">SP</option>
+                </select>
+              </label>
+              <label>
+                Clan
+                <input id="clanFilter" type="text" placeholder="Royal Paladin" />
+              </label>
+              <button id="catalogButton">Load catalog</button>
+            </div>
+            <div class="status" id="catalogStatus"></div>
+          </div>
+          <div class="panel-output">
+            <ul class="results" id="catalogResults"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

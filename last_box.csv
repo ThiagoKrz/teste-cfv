@@ -1,0 +1,40 @@
+set,id,name,grade,clan,type,rarity,qtt
+BT02,4,Maiden of Libra,2,Oracle Think Tank,Normal Unit,RRR,1
+BT02,19,Hadron Badon,2,Pale Moon,Normal Unit,RR,1
+BT02,24,Flame Edge Dragon,2,Kagero,Normal Unit,R,1
+BT02,25,"Dragon Dancer, Bernadette",2,Kagero,Normal Unit,R,1
+BT02,26,"Dragon Monk, Enbi",1,Kagero,Normal Unit,R,1
+BT02,28,Full Moon Specter,3,Granblue,Normal Unit,R,1
+BT02,30,Captain Nightmist,2,Granblue,Normal Unit,R,1
+BT02,34,Blue Dust,2,Dark Irregulars,Normal Unit,R,1
+BT02,37,Alluring Succubus,1,Dark Irregulars,Normal Unit,R,2
+BT02,41,"Knight of Tribulations, Galahad",3,Royal Paladin,Normal Unit,C,1
+BT02,43,"Knight of Harvest, Galahad",1,Royal Paladin,Normal Unit,C,1
+BT02,44,Drangal,0,Royal Paladin,Normal Unit,C,1
+BT02,45,Alabaster Owl,0,Royal Paladin,Critical Trigger,C,1
+BT02,47,Borgal,0,Royal Paladin,Heal Trigger,C,1
+BT02,48,"Amber Dragon, Eclipse",3,Kagero,Normal Unit,C,1
+BT02,50,"Amber Dragon, Dawn",1,Kagero,Normal Unit,C,3
+BT02,51,"Amber Dragon, Daylight",0,Kagero,Normal Unit,C,1
+BT02,53,Blue Ray Dracokid,0,Kagero,Critical Trigger,C,1
+BT02,54,"Dragon Dancer, Rakshasa",0,Kagero,Stand Trigger,C,1
+BT02,55,"Dragon Monk, Genjo",0,Kagero,Heal Trigger,C,1
+BT02,56,"Dragon Undead, Skull Dragon",3,Granblue,Normal Unit,C,1
+BT02,58,Evil Shade,1,Granblue,Normal Unit,C,1
+BT02,60,Knight Spirit,0,Granblue,Critical Trigger,C,1
+BT02,61,Hook-wielding Zombie,0,Granblue,Draw Trigger,C,1
+BT02,62,Rick the Ghost,0,Granblue,Heal Trigger,C,2
+BT02,63,Doctor Rouge,0,Granblue,Heal Trigger,C,1
+BT02,64,Stil Vampire,3,Dark Irregulars,Normal Unit,C,2
+BT02,65,Dark Soul Conductor,2,Dark Irregulars,Normal Unit,C,1
+BT02,66,Hysteric Shirley,0,Dark Irregulars,Draw Trigger,C,1
+BT02,67,Blitzritter,0,Dark Irregulars,Critical Trigger,C,2
+BT02,68,Cursed Doctor,0,Dark Irregulars,Heal Trigger,C,2
+BT02,69,Dark Knight of Nightmareland,0,Dark Irregulars,Critical Trigger,C,1
+BT02,70,Mad Hatter of Nightmareland,0,Dark Irregulars,Draw Trigger,C,1
+BT02,71,Cheshire Cat of Nightmareland,0,Dark Irregulars,Heal Trigger,C,1
+BT02,72,Elephants Juggler,3,Pale Moon,Normal Unit,C,1
+BT02,73,"Fire Breeze, Carrie",2,Pale Moon,Normal Unit,C,1
+BT02,75,Starting Presenter,1,Pale Moon,Normal Unit,C,3
+BT02,77,Dynamite Juggler,0,Pale Moon,Critical Trigger,C,1
+BT02,78,Spiral Master,0,Pale Moon,Draw Trigger,C,3
