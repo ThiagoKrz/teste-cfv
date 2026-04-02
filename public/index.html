@@ -20,42 +20,75 @@
     <div class="bg-orb orb-three"></div>
     <header class="hero">
       <nav class="nav">
-        <div class="brand">CFVanguard</div>
-        <div class="nav-actions">
-          <a class="nav-link" href="#open">Open packs</a>
-          <a class="nav-link" href="#catalog">Catalog</a>
+        <div class="nav-shell">
+          <div class="nav-left">
+            <div class="brand">CFVanguard</div>
+            <span class="brand-sub" data-i18n="nav.subtitle">Pack Lab</span>
+          </div>
+          <div class="nav-actions">
+            <a class="nav-link" href="#open" data-i18n="nav.open">Open packs</a>
+            <a class="nav-link" href="#catalog" data-i18n="nav.catalog">Catalog</a>
+          </div>
+          <div class="nav-tools">
+            <button id="themeToggle" class="icon-btn" type="button" aria-label="Light">
+              <span class="theme-icon icon-sun" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  <path
+                    d="M12 2.5v3.2M12 18.3v3.2M4.6 4.6l2.3 2.3M17.1 17.1l2.3 2.3M2.5 12h3.2M18.3 12h3.2M4.6 19.4l2.3-2.3M17.1 6.9l2.3-2.3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </span>
+              <span class="theme-icon icon-moon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M20.6 15.5a8.6 8.6 0 1 1-9.7-12 7.2 7.2 0 0 0 9.7 12z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+            </button>
+            <button id="langToggle" class="icon-btn" type="button">
+              <span class="flag flag-us" aria-hidden="true"></span>
+              <span class="flag-text">EN</span>
+            </button>
+          </div>
         </div>
       </nav>
       <div class="hero-grid">
         <div class="hero-copy">
-          <p class="badge">Vanguard pack lab</p>
-          <h1>Spin the pack. Pull the legend.</h1>
-          <p class="subtitle">
+          <p class="badge" data-i18n="hero.badge">Vanguard pack lab</p>
+          <h1 data-i18n="hero.title">Spin the pack. Pull the legend.</h1>
+          <p class="subtitle" data-i18n="hero.subtitle">
             Search the vanguardcard.io database, build a live pool, and open
             packs with rarity-style pulls and gorgeous card art.
           </p>
           <div class="hero-actions">
-            <a class="cta" href="#open">Open packs</a>
-            <a class="ghost" href="#catalog">Browse catalog</a>
+            <a class="cta" href="#open" data-i18n="hero.ctaOpen">Open packs</a>
+            <a class="ghost" href="#catalog" data-i18n="hero.ctaCatalog">Browse catalog</a>
           </div>
           <div class="hero-stats">
             <div class="stat">
-              <span>Live data</span>
-              <small>vanguardcard.io</small>
+              <span data-i18n="hero.statLive">Live data</span>
+              <small data-i18n="hero.statLiveSub">vanguardcard.io</small>
             </div>
             <div class="stat">
-              <span>Pack builder</span>
-              <small>Rarity weighted pulls</small>
+              <span data-i18n="hero.statBuilder">Pack builder</span>
+              <small data-i18n="hero.statBuilderSub">Rarity weighted pulls</small>
             </div>
             <div class="stat">
-              <span>Dynamic filters</span>
-              <small>Grade, clan, rarity</small>
+              <span data-i18n="hero.statFilters">Dynamic filters</span>
+              <small data-i18n="hero.statFiltersSub">Grade, clan, rarity</small>
             </div>
           </div>
         </div>
         <div class="hero-card">
-          <h3>Pack logic</h3>
-          <p>Pull 4 commons + 1 rare slot by default.</p>
+          <h3 data-i18n="hero.logicTitle">Pack logic</h3>
+          <p data-i18n="hero.logicDesc">Pull 4 commons + 1 rare slot by default.</p>
           <div class="odds-grid">
             <div class="odds-chip rarity-r">
               <span>R</span>
@@ -74,10 +107,7 @@
               <small>1%</small>
             </div>
           </div>
-          <div class="hero-note">
-            <strong>Tip</strong>
-            Search by set name, clan, or ID to shape your pool.
-          </div>
+          <div class="hero-note" data-i18n="hero.tip">Tip: Search by set name, clan, or ID to shape your pool.</div>
         </div>
       </div>
     </header>
@@ -86,39 +116,53 @@
       <section class="panel" id="open">
         <div class="panel-header">
           <div>
-            <h2>Pack opener</h2>
-            <p>Build a pool and open packs with rarity-weighted pulls.</p>
+            <h2 data-i18n="pack.title">Pack opener</h2>
+            <p data-i18n="pack.subtitle">Build a pool and open packs with rarity-weighted pulls.</p>
           </div>
-          <div class="pill">Main focus</div>
+          <div class="pill" data-i18n="pack.pill">Main focus</div>
         </div>
         <div class="panel-grid">
-          <div class="panel-control">
+          <div class="panel-control pack-controls">
+            <div class="pack-intro">
+              <h3 data-i18n="pack.introTitle">Pool setup</h3>
+              <p data-i18n="pack.introDesc">
+                Pick a set, narrow by clan or nation, then open packs.
+              </p>
+              <span class="helper" data-i18n="pack.helper">
+                Uses vanguardcard.io card database.
+              </span>
+            </div>
             <div class="controls">
               <label>
-                Search pool
-                <input
-                  id="packQuery"
-                  type="text"
-                  placeholder="Kagero, Monster Strike, 411021"
-                />
-                <span class="helper">Uses vanguardcard.io card database.</span>
+                <span data-i18n="pack.searchPool">Search pool</span>
+                <select id="packQuery"></select>
               </label>
               <label>
-                Packs
-                <input id="packCount" type="number" min="1" max="24" value="3" />
+                <span data-i18n="pack.clan">Clan</span>
+                <select id="packClan"></select>
               </label>
               <label>
-                Cards per pack
-                <input id="packSize" type="number" min="3" max="8" value="5" />
+                <span data-i18n="pack.nation">Nation</span>
+                <select id="packNation"></select>
               </label>
-              <button id="openButton">Open packs</button>
+              <label>
+                <span data-i18n="pack.packs">Packs</span>
+                <input id="packCount" type="number" min="1" max="20" value="3" />
+              </label>
+              <label>
+                <span data-i18n="pack.cardsPerPack">Cards per pack</span>
+                <input id="packSize" type="number" min="5" max="10" value="7" />
+              </label>
             </div>
+            <button id="openButton" data-i18n="pack.open">Open packs</button>
             <div class="status" id="packStatus"></div>
             <div class="summary" id="packSummary"></div>
           </div>
           <div class="panel-output">
             <div class="results" id="packResults">
-              <div class="empty-state">Open packs to see pulls here.</div>
+              <div class="empty-state" data-i18n="pack.statusSelect">
+                Select a pool or filters first.
+              </div>
             </div>
           </div>
         </div>
@@ -127,53 +171,69 @@
       <section class="panel" id="catalog">
         <div class="panel-header">
           <div>
-            <h2>Card catalog</h2>
-            <p>Load the database and refine by grade, clan, rarity, or format.</p>
+            <h2 data-i18n="catalog.title">Card catalog</h2>
+            <p data-i18n="catalog.subtitle">Load the database and refine by grade, clan, rarity, or format.</p>
           </div>
-          <div class="pill ghost-pill">Filters</div>
+          <div class="pill ghost-pill" data-i18n="catalog.pill">Filters</div>
         </div>
-        <div class="panel-grid">
-          <div class="panel-control">
-            <div class="controls">
+        <div class="catalog-layout">
+          <div class="catalog-controls">
+            <div class="controls catalog-controls-grid">
               <label>
-                Search
+                <span data-i18n="catalog.search">Search</span>
                 <input
                   id="catalogQuery"
                   type="text"
                   placeholder="Overlord, Royal Paladin, 411021"
+                  data-i18n-placeholder="catalog.searchPlaceholder"
                 />
               </label>
               <label>
-                Rarity
+                <span data-i18n="catalog.rarity">Rarity</span>
                 <select id="filterRarity"></select>
               </label>
               <label>
-                Grade
+                <span data-i18n="catalog.grade">Grade</span>
                 <select id="filterGrade"></select>
               </label>
               <label>
-                Clan
+                <span data-i18n="catalog.clan">Clan</span>
                 <select id="filterClan"></select>
               </label>
               <label>
-                Nation
+                <span data-i18n="catalog.nation">Nation</span>
                 <select id="filterNation"></select>
               </label>
               <label>
-                Format
+                <span data-i18n="catalog.format">Format</span>
                 <select id="filterFormat"></select>
               </label>
-              <button id="catalogButton">Load catalog</button>
+              <label>
+                <span data-i18n="catalog.order">Order</span>
+                <select id="filterOrder">
+                  <option value="asc" data-i18n="catalog.orderAsc">A-Z</option>
+                  <option value="desc" data-i18n="catalog.orderDesc">Z-A</option>
+                </select>
+              </label>
+              <button id="catalogButton" data-i18n="catalog.load">Load catalog</button>
             </div>
             <div class="status" id="catalogStatus"></div>
           </div>
-          <div class="panel-output">
-            <div class="results" id="catalogResults">
-              <div class="empty-state">Load the catalog to see cards here.</div>
-            </div>
+          <div class="results catalog-results" id="catalogResults">
+            <div class="empty-state">Load the catalog to see cards here.</div>
           </div>
         </div>
       </section>
     </main>
+
+    <div class="modal" id="cardModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close="true"></div>
+      <div class="modal-panel" role="dialog" aria-modal="true">
+        <button class="modal-close" type="button" data-close="true">
+          Close
+        </button>
+        <div class="modal-body" id="cardModalBody"></div>
+      </div>
+    </div>
   </body>
 </html>

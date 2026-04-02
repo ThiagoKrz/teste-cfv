@@ -5,6 +5,12 @@ const openButton = document.getElementById("openButton");
 const packStatus = document.getElementById("packStatus");
 const packSummary = document.getElementById("packSummary");
 const packResults = document.getElementById("packResults");
+const packClan = document.getElementById("packClan");
+const packNation = document.getElementById("packNation");
+const cardModal = document.getElementById("cardModal");
+const cardModalBody = document.getElementById("cardModalBody");
+const themeToggle = document.getElementById("themeToggle");
+const langToggle = document.getElementById("langToggle");
 
 const catalogQuery = document.getElementById("catalogQuery");
 const catalogButton = document.getElementById("catalogButton");
@@ -16,12 +22,264 @@ const filterGrade = document.getElementById("filterGrade");
 const filterClan = document.getElementById("filterClan");
 const filterNation = document.getElementById("filterNation");
 const filterFormat = document.getElementById("filterFormat");
+const filterOrder = document.getElementById("filterOrder");
 
 const DEFAULT_IMAGE =
   "https://images.vanguardcard.io/images/assets/CardBack.jpg";
-const MAX_RESULTS = 160;
+const IMAGE_BASE = "https://images.vanguardcard.io/images/cards";
+const MAX_RESULTS = 200;
 
 let catalogCards = [];
+let packAnimationActive = false;
+let lastOpenedPacks = [];
+const cardCache = new Map();
+let packOptionsLoaded = false;
+let packAllCardsCache = null;
+let currentLang = "en";
+let currentTheme = "dark";
+
+const I18N = {
+  en: {
+    nav: { subtitle: "Pack Lab", open: "Open packs", catalog: "Catalog" },
+    hero: {
+      badge: "Vanguard pack lab",
+      title: "Spin the pack. Pull the legend.",
+      subtitle:
+        "Search the vanguardcard.io database, build a live pool, and open packs with rarity-style pulls and gorgeous card art.",
+      ctaOpen: "Open packs",
+      ctaCatalog: "Browse catalog",
+      statLive: "Live data",
+      statLiveSub: "vanguardcard.io",
+      statBuilder: "Pack builder",
+      statBuilderSub: "Rarity weighted pulls",
+      statFilters: "Dynamic filters",
+      statFiltersSub: "Grade, clan, rarity",
+      logicTitle: "Pack logic",
+      logicDesc: "Pull 4 commons + 1 rare slot by default.",
+      tip: "Tip: Search by set name, clan, or ID to shape your pool.",
+    },
+    pack: {
+      title: "Pack opener",
+      subtitle: "Build a pool and open packs with rarity-weighted pulls.",
+      pill: "Main focus",
+      introTitle: "Pool setup",
+      introDesc: "Pick a set, narrow by clan or nation, then open packs.",
+      searchPool: "Search pool",
+      clan: "Clan",
+      nation: "Nation",
+      packs: "Packs",
+      cardsPerPack: "Cards per pack",
+      open: "Open packs",
+      opening: "Opening...",
+      helper: "Uses vanguardcard.io card database.",
+      statusSelect: "Select a pool or filters first.",
+      statusLoadingAll: "Loading full card pool...",
+      statusLoading: "Loading card pool...",
+      statusNone: "No cards found for this search.",
+      statusTry: "Try another search.",
+      statusOpened: "Opened {count} pack{plural} from {total} cards.",
+      statusSkip: "Click the results to skip the animation.",
+      summaryTotal: "Total cards",
+      summaryRarity: "Rarity mix",
+    },
+    catalog: {
+      title: "Card catalog",
+      subtitle: "Load the database and refine by grade, clan, rarity, or format.",
+      pill: "Filters",
+      search: "Search",
+      searchPlaceholder: "Overlord, Royal Paladin, 411021",
+      rarity: "Rarity",
+      grade: "Grade",
+      clan: "Clan",
+      nation: "Nation",
+      format: "Format",
+      order: "Order",
+      orderAsc: "A-Z",
+      orderDesc: "Z-A",
+      load: "Load catalog",
+      statusLoading: "Loading catalog...",
+      statusLoadingAll: "Loading full catalog...",
+      statusNone: "No cards found for this search.",
+      statusTry: "Try another search.",
+      statusLoaded: "Loaded {count} cards.",
+      statusUnavailable: "Catalog unavailable.",
+    },
+    common: {
+      all: "All",
+      allCards: "All cards",
+      anyClan: "Any clan",
+      anyNation: "Any nation",
+      emptyResults: "No results.",
+      building: "Building packs...",
+      fetching: "Fetching cards...",
+    },
+    theme: { light: "Light", dark: "Dark" },
+    lang: { en: "EN", pt: "PT-BR" },
+  },
+  pt: {
+    nav: { subtitle: "Pack Lab", open: "Abrir packs", catalog: "Catalogo" },
+    hero: {
+      badge: "Laboratorio de packs",
+      title: "Gire o pack. Puxe a lenda.",
+      subtitle:
+        "Pesquise o banco da vanguardcard.io, monte um pool e abra packs com raridades e artes incriveis.",
+      ctaOpen: "Abrir packs",
+      ctaCatalog: "Ver catalogo",
+      statLive: "Dados ao vivo",
+      statLiveSub: "vanguardcard.io",
+      statBuilder: "Construtor de packs",
+      statBuilderSub: "Probabilidades por raridade",
+      statFilters: "Filtros dinamicos",
+      statFiltersSub: "Grade, clan, raridade",
+      logicTitle: "Logica do pack",
+      logicDesc: "4 comuns + 1 slot raro por padrao.",
+      tip: "Dica: pesquise por set, clan ou ID para montar o pool.",
+    },
+    pack: {
+      title: "Abrir packs",
+      subtitle: "Monte um pool e abra packs com raridades ponderadas.",
+      pill: "Foco principal",
+      introTitle: "Configurar pool",
+      introDesc: "Escolha o set, filtre por clan ou nation e abra packs.",
+      searchPool: "Pool",
+      clan: "Clan",
+      nation: "Nation",
+      packs: "Packs",
+      cardsPerPack: "Cartas por pack",
+      open: "Abrir packs",
+      opening: "Abrindo...",
+      helper: "Usa o banco da vanguardcard.io.",
+      statusSelect: "Escolha um pool ou filtros primeiro.",
+      statusLoadingAll: "Carregando pool completo...",
+      statusLoading: "Carregando pool...",
+      statusNone: "Nenhuma carta encontrada.",
+      statusTry: "Tente outra busca.",
+      statusOpened: "Abriu {count} pack{plural} de {total} cartas.",
+      statusSkip: "Clique nos resultados para pular a animacao.",
+      summaryTotal: "Total de cartas",
+      summaryRarity: "Mix de raridades",
+    },
+    catalog: {
+      title: "Catalogo de cartas",
+      subtitle: "Carregue o banco e filtre por grade, clan, raridade ou formato.",
+      pill: "Filtros",
+      search: "Buscar",
+      searchPlaceholder: "Overlord, Royal Paladin, 411021",
+      rarity: "Raridade",
+      grade: "Grade",
+      clan: "Clan",
+      nation: "Nation",
+      format: "Formato",
+      order: "Ordem",
+      orderAsc: "A-Z",
+      orderDesc: "Z-A",
+      load: "Carregar catalogo",
+      statusLoading: "Carregando catalogo...",
+      statusLoadingAll: "Carregando catalogo completo...",
+      statusNone: "Nenhuma carta encontrada.",
+      statusTry: "Tente outra busca.",
+      statusLoaded: "{count} cartas carregadas.",
+      statusUnavailable: "Catalogo indisponivel.",
+    },
+    common: {
+      all: "Todos",
+      allCards: "Todas as cartas",
+      anyClan: "Qualquer clan",
+      anyNation: "Qualquer nation",
+      emptyResults: "Sem resultados.",
+      building: "Montando packs...",
+      fetching: "Buscando cartas...",
+    },
+    theme: { light: "Claro", dark: "Noturno" },
+    lang: { en: "EN", pt: "PT-BR" },
+  },
+};
+
+function t(key) {
+  const parts = key.split(".");
+  let value = I18N[currentLang];
+  for (const part of parts) {
+    value = value ? value[part] : null;
+  }
+  return value || key;
+}
+
+function applyTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    const key = element.getAttribute("data-i18n");
+    element.textContent = t(key);
+  });
+
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    const key = element.getAttribute("data-i18n-placeholder");
+    element.setAttribute("placeholder", t(key));
+  });
+
+  if (themeToggle) {
+    const nextMode = currentTheme === "dark" ? "light" : "dark";
+    themeToggle.dataset.mode = nextMode;
+    const label = nextMode === "light" ? t("theme.light") : t("theme.dark");
+    themeToggle.setAttribute("aria-label", label);
+    themeToggle.setAttribute("title", label);
+  }
+
+  if (langToggle) {
+    const flag = langToggle.querySelector(".flag");
+    const label = langToggle.querySelector(".flag-text");
+    if (flag) {
+      flag.classList.toggle("flag-us", currentLang === "en");
+      flag.classList.toggle("flag-br", currentLang === "pt");
+    }
+    if (label) {
+      label.textContent = currentLang === "en" ? t("lang.en") : t("lang.pt");
+    }
+  }
+}
+
+function refreshPackSelectLabels() {
+  if (!packAllCardsCache) {
+    return;
+  }
+  const sets = uniqueSorted(
+    packAllCardsCache.map((card) => normalizeText(card.set)).filter(Boolean),
+    false
+  );
+  const clans = uniqueSorted(
+    packAllCardsCache.map((card) => normalizeText(card.clan)).filter(Boolean),
+    false
+  );
+  const nations = uniqueSorted(
+    packAllCardsCache.map((card) => normalizeText(card.nation)).filter(Boolean),
+    false
+  );
+  setPackOptions(sets);
+  if (packClan) {
+    setSelectOptions(packClan, clans, t("common.anyClan"));
+  }
+  if (packNation) {
+    setSelectOptions(packNation, nations, t("common.anyNation"));
+  }
+}
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.body.setAttribute("data-theme", theme);
+  localStorage.setItem("cfv-theme", theme);
+  applyTranslations();
+}
+
+function applyLanguage(lang) {
+  currentLang = lang;
+  document.body.setAttribute("data-lang", lang);
+  document.documentElement.lang = lang === "pt" ? "pt-BR" : "en";
+  localStorage.setItem("cfv-lang", lang);
+  applyTranslations();
+  refreshPackSelectLabels();
+  if (catalogCards.length) {
+    buildFilters(catalogCards);
+    renderCatalog();
+  }
+}
 
 function setButtonLoading(button, isLoading, label) {
   if (!button) {
@@ -52,6 +310,118 @@ function escapeHtml(value) {
 
 function normalizeText(value) {
   return String(value || "").trim();
+}
+
+function resolveImage(card) {
+  if (card.imageUrl) {
+    return card.imageUrl;
+  }
+  if (card.id) {
+    return `${IMAGE_BASE}/${encodeURIComponent(card.id)}-jp.jpg`;
+  }
+  return DEFAULT_IMAGE;
+}
+
+function cacheCard(card) {
+  const key = normalizeText(card.id) || normalizeText(card.name);
+  if (!key) {
+    return "";
+  }
+  if (!cardCache.has(key)) {
+    cardCache.set(key, { ...card });
+  } else {
+    const existing = cardCache.get(key);
+    cardCache.set(key, { ...existing, ...card });
+  }
+  return key;
+}
+
+function formatEffect(text) {
+  const safe = escapeHtml(normalizeText(text));
+  return safe.replace(/\n/g, "<br />");
+}
+
+function buildMetaItem(label, value) {
+  const display = normalizeText(value);
+  if (!display || display.toLowerCase() === "n/a") {
+    return "";
+  }
+
+  return `<div class="meta-item">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(display)}</strong>
+  </div>`;
+}
+
+function setPackOptions(options) {
+  if (!packQuery || packQuery.tagName !== "SELECT") {
+    return;
+  }
+
+  const current = packQuery.value;
+  packQuery.innerHTML = "";
+
+  const allOption = document.createElement("option");
+  allOption.value = "all";
+  allOption.textContent = t("common.allCards");
+  packQuery.appendChild(allOption);
+
+  options.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    packQuery.appendChild(option);
+  });
+
+  packQuery.value = options.includes(current) ? current : "all";
+}
+
+async function loadPackOptions() {
+  if (packOptionsLoaded) {
+    return;
+  }
+
+  packOptionsLoaded = true;
+  try {
+    const response = await fetch(
+      `/api/search?search=&limit=${MAX_RESULTS}&all=1&maxPages=10`
+    );
+    if (!response.ok) {
+      setPackOptions([]);
+      return;
+    }
+
+    const data = await response.json();
+    const cards = data.cards || [];
+    packAllCardsCache = cards;
+    const sets = uniqueSorted(
+      cards.map((card) => normalizeText(card.set)).filter(Boolean),
+      false
+    );
+    const clans = uniqueSorted(
+      cards.map((card) => normalizeText(card.clan)).filter(Boolean),
+      false
+    );
+    const nations = uniqueSorted(
+      cards.map((card) => normalizeText(card.nation)).filter(Boolean),
+      false
+    );
+    setPackOptions(sets);
+    if (packClan) {
+      setSelectOptions(packClan, clans, t("common.anyClan"));
+    }
+    if (packNation) {
+      setSelectOptions(packNation, nations, t("common.anyNation"));
+    }
+  } catch (error) {
+    setPackOptions([]);
+    if (packClan) {
+      setSelectOptions(packClan, [], t("common.anyClan"));
+    }
+    if (packNation) {
+      setSelectOptions(packNation, [], t("common.anyNation"));
+    }
+  }
 }
 
 function setSelectOptions(select, values, placeholder) {
@@ -86,27 +456,27 @@ function buildFilters(cards) {
   setSelectOptions(
     filterRarity,
     uniqueSorted(cards.map((card) => normalizeText(card.rarity)), false),
-    "All"
+    t("common.all")
   );
   setSelectOptions(
     filterGrade,
     uniqueSorted(cards.map((card) => normalizeText(card.grade)), true),
-    "All"
+    t("common.all")
   );
   setSelectOptions(
     filterClan,
     uniqueSorted(cards.map((card) => normalizeText(card.clan)), false),
-    "All"
+    t("common.all")
   );
   setSelectOptions(
     filterNation,
     uniqueSorted(cards.map((card) => normalizeText(card.nation)), false),
-    "All"
+    t("common.all")
   );
   setSelectOptions(
     filterFormat,
     uniqueSorted(cards.map((card) => normalizeText(card.format)), false),
-    "All"
+    t("common.all")
   );
 }
 
@@ -116,8 +486,10 @@ function applyFilters(cards) {
   const clan = normalizeText(filterClan.value);
   const nation = normalizeText(filterNation.value);
   const format = normalizeText(filterFormat.value);
+  const order = normalizeText(filterOrder.value) || "asc";
 
-  return cards.filter((card) => {
+  const filtered = cards.map((card, index) => ({ card, index })).filter((entry) => {
+    const card = entry.card;
     if (rarity && normalizeText(card.rarity) !== rarity) {
       return false;
     }
@@ -135,6 +507,29 @@ function applyFilters(cards) {
     }
     return true;
   });
+
+  const sorted = filtered.slice().sort((left, right) => {
+    const a = left.card;
+    const b = right.card;
+    const aId = Number.parseInt(normalizeText(a.id), 10);
+    const bId = Number.parseInt(normalizeText(b.id), 10);
+    const aHasId = Number.isFinite(aId);
+    const bHasId = Number.isFinite(bId);
+
+    if (aHasId && bHasId) {
+      return aId - bId;
+    }
+    if (aHasId) {
+      return -1;
+    }
+    if (bHasId) {
+      return 1;
+    }
+    return left.index - right.index;
+  });
+
+  const ordered = order === "desc" ? sorted.reverse() : sorted;
+  return ordered.map((entry) => entry.card);
 }
 
 function buildMetaLine(card) {
@@ -153,9 +548,12 @@ function buildMetaLine(card) {
 function renderCardTile(card) {
   const rarityValue = normalizeText(card.rarity) || "UNKNOWN";
   const rarityClass = `rarity-${rarityValue.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
-  const imageUrl = card.imageUrl || DEFAULT_IMAGE;
+  const imageUrl = resolveImage(card);
+  const cardKey = cacheCard(card);
 
-  return `<article class="card-tile ${rarityClass}">
+  return `<article class="card-tile ${rarityClass}" data-card-key="${escapeHtml(
+    cardKey
+  )}">
     <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(card.name)}" />
     <div class="card-body">
       <div class="card-name">${escapeHtml(card.name)}</div>
@@ -168,15 +566,137 @@ function renderCardTile(card) {
   </article>`;
 }
 
-function renderPack(pack, index) {
-  const cards = pack.map(renderCardTile).join("");
-  return `<article class="pack-result">
+function renderPack(pack, index, animate) {
+  const cards = pack
+    .map((card, cardIndex) => {
+      if (!animate) {
+        return renderCardTile(card);
+      }
+      const delay = 80 + cardIndex * 80;
+      const tile = renderCardTile(card);
+      return tile.replace(
+        "<article",
+        `<article style=\"animation-delay:${delay}ms\"`
+      );
+    })
+    .join("");
+
+  return `<article class="pack-result${animate ? " pack-animating" : ""}">
     <header>
       <span>Pack ${index + 1}</span>
       <span>${pack.length} cards</span>
     </header>
     <div class="pack-grid">${cards}</div>
   </article>`;
+}
+
+function skipPackAnimation() {
+  if (!packAnimationActive || !lastOpenedPacks.length) {
+    return false;
+  }
+  packAnimationActive = false;
+  packResults.innerHTML = lastOpenedPacks
+    .map((pack, index) => renderPack(pack, index, false))
+    .join("");
+  if (packStatus.textContent.includes(t("pack.statusSkip"))) {
+    packStatus.textContent = packStatus.textContent.replace(
+      ` ${t("pack.statusSkip")}`,
+      ""
+    );
+  }
+  return true;
+}
+
+function renderModal(card) {
+  if (!cardModalBody) {
+    return;
+  }
+
+  const rarityValue = normalizeText(card.rarity) || "UNKNOWN";
+  const rarityClass = `rarity-${rarityValue.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+  const imageUrl = resolveImage(card);
+  const metaItems = [
+    buildMetaItem("Grade", card.grade),
+    buildMetaItem("Power", card.power),
+    buildMetaItem("Shield", card.shield),
+    buildMetaItem("Rarity", rarityValue),
+    buildMetaItem("Clan", card.clan),
+    buildMetaItem("Nation", card.nation),
+    buildMetaItem("Format", card.format),
+    buildMetaItem("Set", card.set),
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const mainEffect = formatEffect(card.mainEffect);
+  const sourceEffect = formatEffect(card.sourceEffect);
+
+  cardModalBody.innerHTML = `<div class="modal-card">
+    <div>
+      <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(card.name)}" />
+    </div>
+    <div>
+      <div class="modal-title">
+        <h3>${escapeHtml(card.name)}</h3>
+        <span class="chip ${rarityClass}">${escapeHtml(rarityValue)}</span>
+      </div>
+      <p class="card-sub">ID ${escapeHtml(card.id || "-")}</p>
+      <div class="modal-meta">${metaItems}</div>
+      <div class="modal-effects">
+        ${mainEffect ? `<p>${mainEffect}</p>` : ""}
+        ${sourceEffect ? `<p class=\"muted\">${sourceEffect}</p>` : ""}
+      </div>
+      <div class="link-row">
+        <a href="${escapeHtml(card.url)}" target="_blank" rel="noopener">View on vanguardcard.io</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+function openCardModal(card) {
+  if (!cardModal) {
+    return;
+  }
+  renderModal(card);
+  cardModal.classList.add("is-open");
+  cardModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCardModal() {
+  if (!cardModal) {
+    return;
+  }
+  cardModal.classList.remove("is-open");
+  cardModal.setAttribute("aria-hidden", "true");
+}
+
+function mergeCardDetails(base, extra) {
+  if (!extra) {
+    return base;
+  }
+  const merged = { ...base };
+  Object.keys(extra).forEach((key) => {
+    if (!merged[key] && extra[key]) {
+      merged[key] = extra[key];
+    }
+  });
+  return merged;
+}
+
+async function fetchCardDetails(card) {
+  if (!card.id) {
+    return card;
+  }
+  try {
+    const response = await fetch(`/api/card?search=${encodeURIComponent(card.id)}`);
+    if (!response.ok) {
+      return card;
+    }
+    const data = await response.json();
+    return mergeCardDetails(card, data);
+  } catch (error) {
+    return card;
+  }
 }
 
 function summarizePacks(packs) {
@@ -211,18 +731,18 @@ function renderSummary(summary) {
       return `<div class="rarity-row">
         <span class="chip ${rarityClass}">${escapeHtml(rarity)}</span>
         <div class="bar"><span style="width: ${percent}%"></span></div>
-        <span class="percent">${percent}%</span>
+        <span class="percent">${percent}% (${count})</span>
       </div>`;
     })
     .join("");
 
   return `<div class="summary-grid">
     <div>
-      <h3>Total cards</h3>
+      <h3>${t("pack.summaryTotal")}</h3>
       <p>${summary.totalCards}</p>
     </div>
     <div>
-      <h3>Rarity mix</h3>
+      <h3>${t("pack.summaryRarity")}</h3>
       <div class="rarity-rows">${rows}</div>
     </div>
   </div>`;
@@ -301,7 +821,9 @@ function openPacks(pool, packCount, packSize) {
 }
 
 async function fetchCatalog(query) {
-  const url = `/api/search?search=${encodeURIComponent(query)}&limit=${MAX_RESULTS}`;
+  const trimmed = normalizeText(query);
+  const all = trimmed ? "" : "&all=1&maxPages=10";
+  const url = `/api/search?search=${encodeURIComponent(trimmed)}&limit=${MAX_RESULTS}${all}`;
   const response = await fetch(url);
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -312,40 +834,73 @@ async function fetchCatalog(query) {
 }
 
 async function handleOpenPacks() {
-  const query = normalizeText(packQuery.value);
-  if (!query) {
-    packStatus.textContent = "Type a search term to build a pool.";
+  const rawQuery = normalizeText(packQuery.value);
+  const selectedClan = normalizeText(packClan?.value || "");
+  const selectedNation = normalizeText(packNation?.value || "");
+  let query = rawQuery.toLowerCase() === "all" ? "" : rawQuery;
+  if (!query && (selectedClan || selectedNation)) {
+    query = selectedClan || selectedNation;
+  }
+  const allowAll = !query;
+  if (!query && !allowAll) {
+    packStatus.textContent = t("pack.statusSelect");
     return;
   }
 
   const packCount = Math.max(1, Number(packCountInput.value || 1));
   const packSize = Math.max(1, Number(packSizeInput.value || 5));
 
-  packStatus.textContent = "Loading card pool...";
+  packStatus.textContent = allowAll
+    ? t("pack.statusLoadingAll")
+    : t("pack.statusLoading");
   packSummary.innerHTML = "";
   packResults.innerHTML =
-    "<div class=\"empty-state\">Building packs...</div>";
-  setButtonLoading(openButton, true, "Opening...");
+    `<div class="empty-state">${t("common.building")}</div>`;
+  setButtonLoading(openButton, true, t("pack.opening"));
 
   try {
-    const data = await fetchCatalog(query);
-    const pool = data.cards || [];
+    let pool = [];
+    if (allowAll && Array.isArray(packAllCardsCache) && packAllCardsCache.length) {
+      pool = packAllCardsCache;
+    } else {
+      const data = await fetchCatalog(query);
+      pool = data.cards || [];
+    }
+
+    if (selectedClan) {
+      pool = pool.filter(
+        (card) => normalizeText(card.clan) === selectedClan
+      );
+    }
+    if (selectedNation) {
+      pool = pool.filter(
+        (card) => normalizeText(card.nation) === selectedNation
+      );
+    }
+
     if (!pool.length) {
-      packStatus.textContent = "No cards found for this search.";
+      packStatus.textContent = t("pack.statusNone");
       packResults.innerHTML =
-        "<div class=\"empty-state\">Try another search.</div>";
+        `<div class="empty-state">${t("pack.statusTry")}</div>`;
       return;
     }
 
     const packs = openPacks(pool, packCount, packSize);
-    packResults.innerHTML = packs.map(renderPack).join("");
+    lastOpenedPacks = packs;
+    packAnimationActive = true;
+    packResults.innerHTML = packs
+      .map((pack, index) => renderPack(pack, index, true))
+      .join("");
     packSummary.innerHTML = renderSummary(summarizePacks(packs));
-    packStatus.textContent = `Opened ${packCount} pack${
-      packCount === 1 ? "" : "s"
-    } from ${pool.length} cards.`;
+    const plural = packCount === 1 ? "" : "s";
+    const baseStatus = t("pack.statusOpened")
+      .replace("{count}", String(packCount))
+      .replace("{plural}", plural)
+      .replace("{total}", String(pool.length));
+    packStatus.textContent = `${baseStatus} ${t("pack.statusSkip")}`;
   } catch (error) {
-    packResults.innerHTML = "<div class=\"empty-state\">No results.</div>";
-    packStatus.textContent = error.message || "Failed to open packs.";
+    packResults.innerHTML = `<div class="empty-state">${t("common.emptyResults")}</div>`;
+    packStatus.textContent = error.message || t("common.emptyResults");
   } finally {
     setButtonLoading(openButton, false);
   }
@@ -354,14 +909,14 @@ async function handleOpenPacks() {
 function renderCatalog() {
   if (!catalogCards.length) {
     catalogResults.innerHTML =
-      "<div class=\"empty-state\">No cards loaded.</div>";
+      `<div class="empty-state">${t("common.emptyResults")}</div>`;
     return;
   }
 
   const filtered = applyFilters(catalogCards);
   if (!filtered.length) {
     catalogResults.innerHTML =
-      "<div class=\"empty-state\">No cards match these filters.</div>";
+      `<div class="empty-state">${t("common.emptyResults")}</div>`;
     return;
   }
 
@@ -373,31 +928,34 @@ function renderCatalog() {
 async function handleCatalogLoad() {
   const query = normalizeText(catalogQuery.value);
   const statusLabel = query
-    ? "Loading catalog..."
-    : "Loading full catalog...";
+    ? t("catalog.statusLoading")
+    : t("catalog.statusLoadingAll");
 
   catalogStatus.textContent = statusLabel;
   catalogResults.innerHTML =
-    "<div class=\"empty-state\">Fetching cards...</div>";
-  setButtonLoading(catalogButton, true, "Loading...");
+    `<div class="empty-state">${t("common.fetching")}</div>`;
+  setButtonLoading(catalogButton, true, t("catalog.statusLoading"));
 
   try {
     const data = await fetchCatalog(query);
     catalogCards = data.cards || [];
     if (!catalogCards.length) {
-      catalogStatus.textContent = "No cards found for this search.";
+      catalogStatus.textContent = t("catalog.statusNone");
       catalogResults.innerHTML =
-        "<div class=\"empty-state\">Try another search.</div>";
+        `<div class="empty-state">${t("catalog.statusTry")}</div>`;
       return;
     }
 
     buildFilters(catalogCards);
     renderCatalog();
-    catalogStatus.textContent = `Loaded ${catalogCards.length} cards.`;
+    catalogStatus.textContent = t("catalog.statusLoaded").replace(
+      "{count}",
+      String(catalogCards.length)
+    );
   } catch (error) {
-    catalogStatus.textContent = error.message || "Failed to load catalog.";
-    catalogResults.innerHTML =
-      "<div class=\"empty-state\">Catalog unavailable.</div>";
+    catalogStatus.textContent = error.message || t("catalog.statusUnavailable");
+      catalogResults.innerHTML =
+      `<div class="empty-state">${t("catalog.statusUnavailable")}</div>`;
   } finally {
     setButtonLoading(catalogButton, false);
   }
@@ -409,13 +967,82 @@ openButton.addEventListener("click", () => {
   });
 });
 
+packResults.addEventListener("click", () => {
+  skipPackAnimation();
+});
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+
+  if (target && target.closest && target.closest("[data-close='true']")) {
+    closeCardModal();
+    return;
+  }
+
+  const tile = target && target.closest ? target.closest(".card-tile") : null;
+  if (!tile) {
+    return;
+  }
+
+  if (packAnimationActive) {
+    skipPackAnimation();
+    return;
+  }
+
+  const key = tile.getAttribute("data-card-key");
+  if (!key) {
+    return;
+  }
+
+  const card = cardCache.get(key);
+  if (!card) {
+    return;
+  }
+
+  openCardModal(card);
+  fetchCardDetails(card).then((updated) => {
+    const merged = mergeCardDetails(card, updated);
+    cardCache.set(key, merged);
+    renderModal(merged);
+  });
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeCardModal();
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const storedTheme = localStorage.getItem("cfv-theme");
+  const storedLang = localStorage.getItem("cfv-lang");
+  applyTheme(storedTheme || "dark");
+  applyLanguage(storedLang || "en");
+
+  loadPackOptions().catch(() => {
+    setPackOptions([]);
+  });
+});
+
+if (themeToggle) {
+  themeToggle.addEventListener("click", () => {
+    applyTheme(currentTheme === "dark" ? "light" : "dark");
+  });
+}
+
+if (langToggle) {
+  langToggle.addEventListener("click", () => {
+    applyLanguage(currentLang === "en" ? "pt" : "en");
+  });
+}
+
 catalogButton.addEventListener("click", () => {
   handleCatalogLoad().catch(() => {
     catalogStatus.textContent = "Unexpected error.";
   });
 });
 
-[filterRarity, filterGrade, filterClan, filterNation, filterFormat].forEach(
+[filterRarity, filterGrade, filterClan, filterNation, filterFormat, filterOrder].forEach(
   (select) => {
     select.addEventListener("change", renderCatalog);
   }

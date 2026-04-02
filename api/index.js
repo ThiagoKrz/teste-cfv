@@ -1,7 +1,6 @@
-const cheerio = require("cheerio");
-
 const BASE_URL = "https://vanguardcard.io";
-const IMAGE_FALLBACK = "https://images.vanguardcard.io/images/cards";
+const API_URL = `${BASE_URL}/api/search.php`;
+const IMAGE_BASE = "https://images.vanguardcard.io/images/cards";
 const DEFAULT_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -15,367 +14,251 @@ function normalizeText(value) {
   if (!value) {
     return "";
   }
-  return value.replace(/\s+/g, " ").trim();
+  return String(value).replace(/\s+/g, " ").trim();
 }
 
-function cleanName(value) {
-  let cleaned = normalizeText(value);
-  cleaned = cleaned.replace(/\s+-\s+Cardfight Vanguard.*$/i, "");
-  cleaned = cleaned.replace(/\s+-\s+Cardfight.*$/i, "");
-  cleaned = cleaned.replace(/\s+-\s+vanguardcard\.io$/i, "");
-  cleaned = cleaned.replace(/\s+-\s+Card Database.*$/i, "");
-  return cleaned.trim();
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function extractByLabels(text, labels, stopLabels) {
-  if (!text) {
-    return "";
+function pickField(raw, keys) {
+  for (const key of keys) {
+    if (raw && raw[key] !== undefined && raw[key] !== null) {
+      const value = normalizeText(raw[key]);
+      if (value) {
+        return value;
+      }
+    }
   }
-
-  const labelPattern = labels.map(escapeRegExp).join("|");
-  const stopPattern = stopLabels && stopLabels.length
-    ? stopLabels.map(escapeRegExp).join("|")
-    : "$";
-
-  const pattern = new RegExp(`(?:${labelPattern})\\s*:?\\s*(.+?)(?=${stopPattern}|$)`, "i");
-  const match = text.match(pattern);
-  return match ? normalizeText(match[1]) : "";
+  return "";
 }
 
-function extractRarityToken(text) {
-  if (!text) {
-    return "";
+function buildImageUrl(id, image) {
+  const direct = normalizeText(image);
+  if (direct) {
+    return direct.startsWith("http") ? direct : `${BASE_URL}${direct}`;
   }
-  const match = text.match(/\b(SP|RRR|RR|R|C)\b/i);
-  return match ? match[1].toUpperCase() : "";
+  if (id) {
+    return `${IMAGE_BASE}/${encodeURIComponent(id)}-jp.jpg`;
+  }
+  return "";
 }
 
-function extractCardIdFromImage(url) {
-  if (!url) {
-    return "";
-  }
-  const match = url.match(/\/cards\/(\d+)-/i);
-  return match ? match[1] : "";
-}
-
-function parseStat(text, label, nextLabels) {
-  const next = nextLabels && nextLabels.length
-    ? `(?=${nextLabels.join("|")})`
-    : "$";
-  const pattern = new RegExp(`${label}\\s+(.+?)${next}`, "i");
-  const match = text.match(pattern);
-  return match ? normalizeText(match[1]) : "";
-}
-
-function extractCardData(html, search) {
-  const $ = cheerio.load(html);
-
-  const rawName =
-    normalizeText($(".card-name h1").first().text()) ||
-    normalizeText($("meta[property='og:title']").attr("content")) ||
-    normalizeText($("title").first().text());
-  const name = cleanName(rawName);
-  if (!name) {
-    return null;
-  }
-
-  const imageNode = $(".card-image img").first();
-  let imageUrl =
-    imageNode.attr("data-src") ||
-    imageNode.attr("src") ||
-    $("meta[property='og:image']").attr("content") ||
-    "";
-
-  if (imageUrl && imageUrl.startsWith("//")) {
-    imageUrl = `https:${imageUrl}`;
-  }
-
-  if (!imageUrl && search) {
-    imageUrl = `${IMAGE_FALLBACK}/${encodeURIComponent(search)}-jp.jpg`;
-  }
-
-  const miscText = normalizeText($(".card-misc").first().text());
-  const grade = parseStat(miscText, "Grade", ["Power", "Shield"]);
-  const power = parseStat(miscText, "Power", ["Shield"]);
-  const shield = parseStat(miscText, "Shield", []);
-
-  const costsText = normalizeText($(".card-costs").first().text());
-  const clanMatch = costsText.match(/Clan\s+(.+?)(?=Nation|$)/i);
-  const nationMatch = costsText.match(/Nation\s+(.+)$/i);
-
-  const attributeText = normalizeText($(".card-attribute").first().text());
-  const criticalMatch = attributeText.match(/Critical\s+(.+?)(?=Card Format|$)/i);
-  const formatMatch = attributeText.match(/Card Format\s+(.+)$/i);
-
-  const rarity =
-    normalizeText($(".card-rarity").first().text()) ||
-    extractRarityToken(miscText);
-  const setName = normalizeText($(".card-set .card-set-line").first().text());
-
-  const mainEffect = normalizeText(
-    $(".card-main-eff")
-      .first()
-      .html()
-      ?.replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]+>/g, "") || ""
+function normalizeCard(raw) {
+  const id = pickField(raw, [
+    "id",
+    "cardid",
+    "card_id",
+    "cardcode",
+    "card_code",
+    "code",
+    "cid",
+  ]);
+  const name = pickField(raw, [
+    "name",
+    "card_name",
+    "cardname",
+    "cardName",
+    "title",
+  ]);
+  const grade = pickField(raw, ["grade", "card_grade", "grade_level"]);
+  const power = pickField(raw, ["power", "card_power"]);
+  const shield = pickField(raw, ["shield", "card_shield"]);
+  const rarity = pickField(raw, ["rarity", "card_rarity", "rarity_tier"]);
+  const clan = pickField(raw, ["clan", "card_clan"]);
+  const nation = pickField(raw, ["nation", "card_nation"]);
+  const format = pickField(raw, ["format", "card_format"]);
+  const set = pickField(raw, ["set", "card_set", "set_name", "pack"]);
+  const mainEffect = pickField(raw, [
+    "effect",
+    "effect_text",
+    "text",
+    "skill",
+  ]);
+  const sourceEffect = pickField(raw, [
+    "flavor",
+    "flavor_text",
+    "flavour",
+    "flavorText",
+  ]);
+  const imageUrl = buildImageUrl(
+    id,
+    pickField(raw, ["imageUrl", "image_url", "image", "img", "art"])
   );
-  const sourceEffect = normalizeText(
-    $(".card-source-eff")
-      .first()
-      .html()
-      ?.replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]+>/g, "") || ""
-  );
-  const cardNumber = normalizeText($(".card-number").first().text());
 
   return {
-    id: String(search || "").trim(),
+    id,
     name,
     imageUrl,
     grade,
     power,
     shield,
     rarity,
-    clan: clanMatch ? normalizeText(clanMatch[1]) : "",
-    nation: nationMatch ? normalizeText(nationMatch[1]) : "",
-    critical: criticalMatch ? normalizeText(criticalMatch[1]) : "",
-    format: formatMatch ? normalizeText(formatMatch[1]) : "",
-    set: setName,
-    cardNumber,
+    clan,
+    nation,
+    format,
+    set,
     mainEffect,
     sourceEffect,
-    url: `${BASE_URL}/card/?search=${encodeURIComponent(search || "")}`,
+    url: id ? `${BASE_URL}/card/?search=${encodeURIComponent(id)}` : "",
   };
 }
 
-async function fetchCard(search) {
-  if (typeof fetch !== "function") {
-    throw new Error("FETCH_UNAVAILABLE");
+function extractCards(payload) {
+  if (!payload) {
+    return [];
   }
-
-  const targetUrl = `${BASE_URL}/card/?search=${encodeURIComponent(search)}`;
-  const response = await fetch(targetUrl, {
-    headers: {
-      "User-Agent": DEFAULT_UA,
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
-      Referer: BASE_URL,
-      "Cache-Control": "no-cache",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("FETCH_FAILED");
+  if (Array.isArray(payload)) {
+    return payload;
   }
-
-  if (response.url && !response.url.startsWith(BASE_URL)) {
-    throw new Error("UPSTREAM_BLOCKED");
+  if (Array.isArray(payload.data)) {
+    return payload.data;
   }
-
-  const html = await response.text();
-  const card = extractCardData(html, search);
-  if (!card) {
-    throw new Error("CARD_NOT_FOUND");
+  if (Array.isArray(payload.results)) {
+    return payload.results;
   }
-
-  return card;
+  if (Array.isArray(payload.cards)) {
+    return payload.cards;
+  }
+  if (payload.card) {
+    return [payload.card];
+  }
+  return [];
 }
 
-async function fetchHtml(targetUrl) {
-  if (typeof fetch !== "function") {
-    throw new Error("FETCH_UNAVAILABLE");
-  }
-
-  const response = await fetch(targetUrl, {
-    headers: {
-      "User-Agent": DEFAULT_UA,
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
-      Referer: BASE_URL,
-      "Cache-Control": "no-cache",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("FETCH_FAILED");
-  }
-
-  if (response.url && !response.url.startsWith(BASE_URL)) {
-    throw new Error("UPSTREAM_BLOCKED");
-  }
-
-  return response.text();
-}
-
-function resolveImageUrl(url, fallbackId) {
-  if (!url && fallbackId) {
-    return `${IMAGE_FALLBACK}/${encodeURIComponent(fallbackId)}-jp.jpg`;
-  }
-
-  if (!url) {
-    return "";
-  }
-
-  if (url.startsWith("//")) {
-    return `https:${url}`;
-  }
-
-  if (url.startsWith("/")) {
-    return `${BASE_URL}${url}`;
-  }
-
-  return url;
-}
-
-function extractCatalogCards(html) {
-  const $ = cheerio.load(html);
-  const cards = [];
+function uniqueCards(cards) {
   const seen = new Set();
+  const output = [];
 
-  $("a[href*='/card?search=']").each((_, element) => {
-    const href = $(element).attr("href") || "";
-    const linkUrl = new URL(href, BASE_URL);
-    const id = normalizeText(linkUrl.searchParams.get("search") || "");
-    if (!id || seen.has(id)) {
+  cards.forEach((card) => {
+    const key = card.id || card.name;
+    if (!key || seen.has(key)) {
       return;
     }
-
-    const container = $(element).closest(
-      "tr, .card-item, .card, .result, .card-list-item, li, .row"
-    );
-    const containerText = normalizeText(container.text());
-    const imageNode = $(element).find("img").first();
-    const name = cleanName(
-      normalizeText($(element).attr("title")) ||
-        normalizeText(imageNode.attr("title")) ||
-        normalizeText(imageNode.attr("alt")) ||
-        normalizeText(container.find(".card-name, .name").first().text()) ||
-        normalizeText($(element).text())
-    );
-
-    const imageUrl = resolveImageUrl(
-      imageNode.attr("data-src") || imageNode.attr("src") || "",
-      id
-    );
-
-    const grade =
-      normalizeText(container.find(".card-grade, .grade").first().text()) ||
-      extractByLabels(containerText, ["Grade"], [
-        "Power",
-        "Shield",
-        "Rarity",
-        "Clan",
-        "Nation",
-        "Format",
-        "Set",
-      ]);
-
-    const rarity =
-      normalizeText(container.find(".card-rarity, .rarity").first().text()) ||
-      extractByLabels(containerText, ["Rarity"], [
-        "Grade",
-        "Power",
-        "Clan",
-        "Nation",
-        "Format",
-        "Set",
-      ]) ||
-      extractRarityToken(containerText);
-
-    const clan =
-      normalizeText(container.find(".card-clan, .clan").first().text()) ||
-      extractByLabels(containerText, ["Clan"], ["Nation", "Format", "Set"]);
-
-    const nation =
-      normalizeText(container.find(".card-nation, .nation").first().text()) ||
-      extractByLabels(containerText, ["Nation"], ["Format", "Set"]);
-
-    const format =
-      normalizeText(container.find(".card-format, .format").first().text()) ||
-      extractByLabels(containerText, ["Format", "Card Format"], ["Set"]);
-
-    const setName =
-      normalizeText(
-        container.find("a[href*='/pack']").first().text()
-      ) ||
-      normalizeText(container.find(".card-set, .set").first().text()) ||
-      extractByLabels(containerText, ["Set"], []);
-
-    cards.push({
-      id,
-      name: name || id,
-      imageUrl,
-      grade,
-      rarity,
-      clan,
-      nation,
-      format,
-      set: setName,
-      url: `${BASE_URL}/card/?search=${encodeURIComponent(id)}`,
-    });
-    seen.add(id);
+    seen.add(key);
+    output.push(card);
   });
 
-  $("img").each((_, element) => {
-    const imageNode = $(element);
-    const rawUrl = imageNode.attr("data-src") || imageNode.attr("src") || "";
-    const id = extractCardIdFromImage(rawUrl);
-    if (!id || seen.has(id)) {
-      return;
+  return output;
+}
+
+function filterByQuery(cards, query) {
+  if (!query) {
+    return cards;
+  }
+
+  const lowered = query.toLowerCase();
+  return cards.filter((card) => {
+    const id = normalizeText(card.id).toLowerCase();
+    const name = normalizeText(card.name).toLowerCase();
+    return id.includes(lowered) || name.includes(lowered);
+  });
+}
+
+async function fetchApiCards(query, limit, useSearchParam, page, offset) {
+  if (typeof fetch !== "function") {
+    throw new Error("FETCH_UNAVAILABLE");
+  }
+
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  params.set("sort", "name");
+  if (useSearchParam && query) {
+    params.set("search", query);
+  }
+  if (page) {
+    params.set("page", String(page));
+  }
+  if (offset !== undefined && offset !== null) {
+    params.set("offset", String(offset));
+  }
+
+  const url = `${API_URL}?${params.toString()}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": DEFAULT_UA,
+      Accept: "application/json, text/plain, */*",
+      Referer: BASE_URL,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("FETCH_FAILED");
+  }
+
+  const data = await response.json();
+  return { data, url };
+}
+
+async function fetchAllCatalog(query, limit, maxPages) {
+  const trimmed = normalizeText(query);
+  let page = 1;
+  let allCards = [];
+  let sourceUrl = "";
+
+  while (page <= maxPages) {
+    const offset = (page - 1) * limit;
+    const response = await fetchApiCards(trimmed, limit, true, page, offset);
+    const rawCards = extractCards(response.data);
+    if (!rawCards.length) {
+      sourceUrl = response.url;
+      break;
     }
 
-    const name = cleanName(
-      normalizeText(imageNode.attr("title")) ||
-        normalizeText(imageNode.attr("alt")) ||
-        id
-    );
+    const normalized = rawCards.map(normalizeCard);
+    const before = allCards.length;
+    allCards = uniqueCards(allCards.concat(normalized));
+    sourceUrl = response.url;
 
-    cards.push({
-      id,
-      name: name || id,
-      imageUrl: resolveImageUrl(rawUrl, id),
-      grade: "",
-      rarity: "",
-      clan: "",
-      nation: "",
-      format: "",
-      set: "",
-      url: `${BASE_URL}/card/?search=${encodeURIComponent(id)}`,
-    });
-    seen.add(id);
-  });
+    if (allCards.length === before) {
+      break;
+    }
 
-  return cards;
+    if (rawCards.length < limit) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return { cards: allCards, total: allCards.length, sourceUrl };
 }
 
 async function fetchCatalog(query, limit) {
-  const trimmed = String(query || "").trim();
-  const targetUrl = trimmed
-    ? `${BASE_URL}/card-database/?search=${encodeURIComponent(trimmed)}`
-    : `${BASE_URL}/card-database/`;
+  const trimmed = normalizeText(query);
+  let response = await fetchApiCards(trimmed, limit, true);
+  let rawCards = extractCards(response.data);
+  let cards = uniqueCards(rawCards.map(normalizeCard));
+  let sourceUrl = response.url;
 
-  const html = await fetchHtml(targetUrl);
-  let cards = extractCatalogCards(html);
-  let sourceUrl = targetUrl;
-
-  if (!cards.length && trimmed) {
-    const cardUrl = `${BASE_URL}/card/?search=${encodeURIComponent(trimmed)}`;
-    const cardHtml = await fetchHtml(cardUrl);
-    const mainCard = extractCardData(cardHtml, trimmed);
-    const related = extractCatalogCards(cardHtml);
-    cards = [mainCard, ...related].filter(Boolean);
-    sourceUrl = cardUrl;
+  if (trimmed && !cards.length) {
+    response = await fetchApiCards("", limit, false);
+    rawCards = extractCards(response.data);
+    cards = uniqueCards(rawCards.map(normalizeCard));
+    cards = filterByQuery(cards, trimmed);
+    sourceUrl = response.url;
   }
 
-  return {
-    sourceUrl,
-    cards: cards.slice(0, limit),
-    total: cards.length,
-  };
+  const total =
+    response.data?.total || response.data?.total_count || cards.length;
+
+  return { cards: cards.slice(0, limit), total, sourceUrl };
+}
+
+async function fetchCard(query) {
+  const trimmed = normalizeText(query);
+  const catalog = await fetchCatalog(trimmed, 200);
+  if (!catalog.cards.length) {
+    return null;
+  }
+
+  const exactId = catalog.cards.find((card) => card.id === trimmed);
+  if (exactId) {
+    return exactId;
+  }
+
+  const lowered = trimmed.toLowerCase();
+  return (
+    catalog.cards.find(
+      (card) => normalizeText(card.name).toLowerCase() === lowered
+    ) || catalog.cards[0]
+  );
 }
 
 module.exports = async (req, res) => {
@@ -399,17 +282,14 @@ module.exports = async (req, res) => {
     }
 
     try {
-      const card = await fetchCard(String(search).trim());
-      return sendJson(res, 200, card);
-    } catch (error) {
-      if (error.message === "CARD_NOT_FOUND") {
+      const card = await fetchCard(String(search));
+      if (!card) {
         return sendJson(res, 404, { detail: "Card not found" });
       }
+      return sendJson(res, 200, card);
+    } catch (error) {
       if (error.message === "FETCH_UNAVAILABLE") {
         return sendJson(res, 500, { detail: "Fetch not available" });
-      }
-      if (error.message === "UPSTREAM_BLOCKED") {
-        return sendJson(res, 502, { detail: "Upstream blocked" });
       }
       return sendJson(res, 502, { detail: "Failed to fetch card" });
     }
@@ -418,13 +298,20 @@ module.exports = async (req, res) => {
   if (req.method === "GET" && segments.length >= 2 && segments[1] === "search") {
     const query =
       url.searchParams.get("search") || url.searchParams.get("q") || "";
-    const limitParam = Number(url.searchParams.get("limit") || 120);
+    const limitParam = Number(url.searchParams.get("limit") || 200);
     const limit = Number.isFinite(limitParam)
       ? Math.max(1, Math.min(200, Math.floor(limitParam)))
-      : 120;
+      : 200;
+    const allParam = url.searchParams.get("all") || "";
+    const maxPagesParam = Number(url.searchParams.get("maxPages") || 10);
+    const maxPages = Number.isFinite(maxPagesParam)
+      ? Math.max(1, Math.min(50, Math.floor(maxPagesParam)))
+      : 10;
 
     try {
-      const result = await fetchCatalog(String(query).trim(), limit);
+      const result = allParam
+        ? await fetchAllCatalog(String(query), limit, maxPages)
+        : await fetchCatalog(String(query), limit);
       return sendJson(res, 200, {
         query: String(query || ""),
         total: result.total,
@@ -434,9 +321,6 @@ module.exports = async (req, res) => {
     } catch (error) {
       if (error.message === "FETCH_UNAVAILABLE") {
         return sendJson(res, 500, { detail: "Fetch not available" });
-      }
-      if (error.message === "UPSTREAM_BLOCKED") {
-        return sendJson(res, 502, { detail: "Upstream blocked" });
       }
       return sendJson(res, 502, { detail: "Failed to fetch catalog" });
     }
